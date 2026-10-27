@@ -1,0 +1,22 @@
+# Godot
+.godot/
+*.import
+/game/export_presets.cfg
+/game/android/
+*.apk
+*.aab
+
+# C++ build output and downloaded deps (core/fetch_deps.sh + cmake/ninja regenerate them)
+/core/build*/
+/core/third_party/
+/game/bin/
+
+# Python
+__pycache__/
+*.py[oc]
+.venv/
+.pytest_cache/
+*.egg-info
+build/
+dist/
+wheels/

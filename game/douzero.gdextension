@@ -1,0 +1,16 @@
+[configuration]
+
+entry_symbol = "douzero_library_init"
+compatibility_minimum = "4.3"
+
+[libraries]
+
+linux.debug.x86_64 = "res://bin/libdouzero.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "res://bin/libdouzero.linux.template_release.x86_64.so"
+android.debug.arm64 = "res://bin/android/libdouzero.android.template_debug.arm64.so"
+android.release.arm64 = "res://bin/android/libdouzero.android.template_release.arm64.so"
+
+[dependencies]
+
+linux.x86_64 = { "res://bin/libonnxruntime.so.1": "" }
+android.arm64 = { "res://bin/android/libonnxruntime.so": "" }

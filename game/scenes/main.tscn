@@ -1,0 +1,389 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/hand_view.gd" id="2_hand"]
+
+[sub_resource type="StyleBoxFlat" id="seat_style"]
+bg_color = Color(0, 0, 0, 0.35)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(1, 1, 1, 0.15)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+content_margin_left = 14.0
+content_margin_top = 10.0
+content_margin_right = 14.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="result_style"]
+bg_color = Color(0.08, 0.1, 0.14, 0.95)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.95, 0.75, 0.3, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+content_margin_left = 32.0
+content_margin_top = 24.0
+content_margin_right = 32.0
+content_margin_bottom = 24.0
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_main")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.07, 0.36, 0.22, 1)
+
+[node name="TopBar" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -300.0
+offset_top = 12.0
+offset_right = 300.0
+offset_bottom = 92.0
+grow_horizontal = 2
+alignment = 1
+theme_override_constants/separation = 16
+
+[node name="BottomTitle" type="Label" parent="TopBar"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "底牌"
+
+[node name="BottomCards" type="HBoxContainer" parent="TopBar"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Info" type="Label" parent="TopBar"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "炸弹 0 · 倍数 ×1"
+
+[node name="LeftSeat" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 20.0
+offset_top = -170.0
+offset_right = 180.0
+offset_bottom = -30.0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("seat_style")
+
+[node name="VBox" type="VBoxContainer" parent="LeftSeat"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="LeftSeat/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "上家 (AI)"
+
+[node name="Role" type="Label" parent="LeftSeat/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "—"
+
+[node name="Count" type="Label" parent="LeftSeat/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "剩 17 张"
+
+[node name="Status" type="Label" parent="LeftSeat/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.4, 1)
+theme_override_font_sizes/font_size = 18
+
+[node name="RightSeat" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -180.0
+offset_top = -170.0
+offset_right = -20.0
+offset_bottom = -30.0
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_styles/panel = SubResource("seat_style")
+
+[node name="VBox" type="VBoxContainer" parent="RightSeat"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="RightSeat/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "下家 (AI)"
+
+[node name="Role" type="Label" parent="RightSeat/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "—"
+
+[node name="Count" type="Label" parent="RightSeat/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "剩 17 张"
+
+[node name="Status" type="Label" parent="RightSeat/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.4, 1)
+theme_override_font_sizes/font_size = 18
+
+[node name="MySeat" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -300.0
+offset_right = 180.0
+offset_bottom = -180.0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("seat_style")
+
+[node name="VBox" type="VBoxContainer" parent="MySeat"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="MySeat/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "我"
+
+[node name="Role" type="Label" parent="MySeat/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "—"
+
+[node name="Count" type="Label" parent="MySeat/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "剩 17 张"
+
+[node name="Status" type="Label" parent="MySeat/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.4, 1)
+theme_override_font_sizes/font_size = 18
+
+[node name="LeftPlay" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 200.0
+offset_top = -150.0
+offset_right = 620.0
+offset_bottom = -60.0
+grow_vertical = 2
+theme_override_constants/separation = -30
+
+[node name="RightPlay" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -620.0
+offset_top = -150.0
+offset_right = -200.0
+offset_bottom = -60.0
+grow_horizontal = 0
+grow_vertical = 2
+alignment = 2
+theme_override_constants/separation = -30
+
+[node name="MyPlay" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -400.0
+offset_top = -330.0
+offset_right = 400.0
+offset_bottom = -240.0
+grow_horizontal = 2
+grow_vertical = 0
+alignment = 1
+theme_override_constants/separation = -30
+
+[node name="Actions" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -300.0
+offset_top = -225.0
+offset_right = 300.0
+offset_bottom = -177.0
+grow_horizontal = 2
+grow_vertical = 0
+alignment = 1
+theme_override_constants/separation = 20
+
+[node name="BidBtn" type="Button" parent="Actions"]
+custom_minimum_size = Vector2(120, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "叫地主"
+
+[node name="NoBidBtn" type="Button" parent="Actions"]
+custom_minimum_size = Vector2(120, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "不叫"
+
+[node name="PassBtn" type="Button" parent="Actions"]
+custom_minimum_size = Vector2(120, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "不出"
+
+[node name="HintBtn" type="Button" parent="Actions"]
+custom_minimum_size = Vector2(120, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "提示"
+
+[node name="PlayBtn" type="Button" parent="Actions"]
+custom_minimum_size = Vector2(120, 48)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "出牌"
+
+[node name="Waiting" type="Label" parent="Actions"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.75)
+theme_override_font_sizes/font_size = 22
+text = "等待中…"
+
+[node name="Hand" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 200.0
+offset_top = -160.0
+offset_right = -40.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 0
+script = ExtResource("2_hand")
+
+[node name="Toast" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -40.0
+offset_right = 300.0
+offset_bottom = 0.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.92, 0.5, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 28
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ResultPanel" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -160.0
+offset_right = 300.0
+offset_bottom = 160.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("result_style")
+
+[node name="VBox" type="VBoxContainer" parent="ResultPanel"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="ResultPanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 40
+text = "你赢了！"
+horizontal_alignment = 1
+
+[node name="Detail" type="Label" parent="ResultPanel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 18
+text = "剩余手牌"
+autowrap_mode = 3
+
+[node name="AgainBtn" type="Button" parent="ResultPanel/VBox"]
+custom_minimum_size = Vector2(160, 52)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 24
+text = "再来一局"
+
+[node name="ConnectOverlay" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.03, 0.05, 0.08, 0.92)
+
+[node name="Label" type="Label" parent="ConnectOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 26
+text = "正在启动算法核心…"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[connection signal="pressed" from="Actions/BidBtn" to="." method="_on_bid_pressed" binds= [true]]
+[connection signal="pressed" from="Actions/NoBidBtn" to="." method="_on_bid_pressed" binds= [false]]
+[connection signal="pressed" from="Actions/PassBtn" to="." method="_on_pass_pressed"]
+[connection signal="pressed" from="Actions/HintBtn" to="." method="_on_hint_pressed"]
+[connection signal="pressed" from="Actions/PlayBtn" to="." method="_on_play_pressed"]
+[connection signal="pressed" from="ResultPanel/VBox/AgainBtn" to="." method="_on_again_pressed"]
