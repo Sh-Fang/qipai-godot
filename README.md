@@ -15,7 +15,7 @@ core/              算法核心（C++）：规则 + 特征编码 + ONNX 推理 +
   fetch_deps.sh    下载 ONNX Runtime（linux-x64 / android-arm64）和 godot-cpp
 game/              Godot 4.7 项目（只做 UI）
   models/          三个 DouZero WP 出牌模型（landlord / landlord_up / landlord_down）+ 叫地主模型 bid.onnx
-  bin/             编译出的扩展 + libonnxruntime（android/ 下是手机版）
+  bin/             编译出的扩展 + libonnxruntime（android/ 下是手机版；编译生成，不进 git）
   douzero.gdextension
   scripts/core_client.gd   调用 DouZeroCore（在工作线程里跑，不卡帧）
   scripts/main.gd          牌桌界面
@@ -25,7 +25,6 @@ game/              Godot 4.7 项目（只做 UI）
 reference/         原 Python 核心，作为 C++ 核心的参照（DouZero 原版 env，Apache-2.0）
   scripts/check_cpp.py     逐步对比两边的叫地主、合法动作、模型打分、事件和局面
   scripts/export_bid_model.py  下载叫地主模型权重并转成 game/models/bid.onnx
-legacy-prototype/  最早的模型检查页面（已不用）
 ```
 
 ## 编译和运行
@@ -34,7 +33,7 @@ legacy-prototype/  最早的模型检查页面（已不用）
 
 ```bash
 cd core
-./fetch_deps.sh                                   # 第一次需要
+./fetch_deps.sh                                   # 第一次需要（third_party/ 不进 git）
 cmake -S . -B build -G Ninja && ninja -C build    # 生成 game/bin/libdouzero.linux.*.so 和 build/douzero-cli
 cd .. && godot --headless --path game --import    # 第一次需要：让 Godot 登记扩展
 godot --path game                                 # 或者在程序坞打开 Godot，导入 game/project.godot
