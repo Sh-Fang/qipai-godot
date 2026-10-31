@@ -173,6 +173,29 @@ func _gomoku_check() -> void:
     var g: Node = await _open_board_game("gomoku")
     _screenshot("gomoku_start")
     var board: GomokuBoard = g.board
+    # white (the AI) has four in a column: the four shows, and I press where I'd block it
+    g._game += 1
+    g._busy = false
+    g._apply(await Core.request("gomoku_setup", {"human": 1, "level": 0,
+            "moves": [[0, 0], [7, 3], [0, 2], [7, 4], [0, 4], [7, 5], [0, 6], [7, 6]]}))
+    var fours: Array[Vector2i] = g._fours(2)
+    var warns: bool = fours.size() == 4 and g._fours(1).is_empty()
+    board.warn(fours)
+    var press := InputEventMouseButton.new()
+    press.button_index = MOUSE_BUTTON_LEFT
+    press.pressed = true
+    press.position = board.global_position + board.cell_center(7, 7)
+    get_viewport().push_input(press, true)
+    await get_tree().create_timer(0.2).timeout
+    _screenshot("gomoku_warn_press")
+    var previewed: bool = board._preview == Vector2i(7, 7) and int(g.state["move_count"]) == 8
+    var release := press.duplicate()
+    release.pressed = false
+    get_viewport().push_input(release, true)
+    await get_tree().create_timer(0.1).timeout
+    var placed_on_release: bool = int(g.state["board"][7 * 15 + 7]) == 1
+    await g._new_game()
+    await get_tree().create_timer(0.3).timeout
     var moves := 0
     var undo_ok := false
     while g.state.get("phase") == "playing" and moves < 120:
@@ -221,7 +244,8 @@ func _gomoku_check() -> void:
     var left: bool = app.game == null and app._lobby.visible
     print("AUTOTEST DONE gomoku_over=", g.state.get("phase") == "over" if is_instance_valid(g) else true,
             " moves=", moves, " undo_ok=", undo_ok, " result_shown=", result_shown, " record=", record,
-            " ai_first=", ai_first, " left=", left)
+            " ai_first=", ai_first, " left=", left, " warns=", warns, " previewed=", previewed,
+            " placed_on_release=", placed_on_release)
     get_tree().quit()
 
 func _xiangqi_check() -> void:
