@@ -21,7 +21,10 @@ game/              Godot 4.7 项目（只做 UI）
   scripts/main.gd          牌桌界面
   scripts/card_view.gd     单张牌（显示顺序：大的在左）
   scripts/hand_view.gd     手牌排列与选牌
-  scripts/autotest.gd      自动打一局并截图的冒烟测试
+  scripts/autotest.gd      自动打一局并截图的冒烟测试（还有选牌、超时、设置、特效几种模式）
+  scripts/home_view.gd     首页（加载进度条 → 开始游戏）；scripts/clock_view.gd 回合倒计时闹钟
+  scripts/modal.gd         弹窗底座（压暗牌桌、暂停游戏）；settings_view.gd 设置（音效、音乐、重新开始）；
+                           history_view.gd 积分记录；quit_view.gd 退出确认（安卓返回键、关窗口）
 reference/         原 Python 核心，作为 C++ 核心的参照（DouZero 原版 env，Apache-2.0）
   scripts/check_cpp.py     逐步对比两边的叫地主、合法动作、模型打分、事件和局面
   scripts/export_bid_model.py  下载叫地主模型权重并转成 game/models/bid.onnx
@@ -61,9 +64,10 @@ Godot 只发命令、只按返回的 state 渲染，不包含任何规则判断�
 | `state` | | 取当前状态 |
 | `step` | | 让当前 AI 座位走一步（叫地主或出牌），UI 每步之间做动画 |
 | `bid` | `call: bool` | 玩家叫地主 / 抢地主（true）或不叫 / 不抢（false），看 `state.bid_stage` |
-| `play` | `cards: [id]` | 玩家出牌，不合法返回 `ok:false` + 中文原因 |
+| `double` | `double: bool` | 玩家加倍 / 不加倍（`state.phase == "doubling"` 时） |
+| `play` | `cards: [id]` | 玩家出牌（打出的就是选中的这几张，花色不变），不合法返回 `ok:false` + 中文原因 |
 | `pass` | | 玩家不出 |
-| `hint` | | 用模型给玩家推荐出牌 |
+| `hint` | `index?` | 智能提示：模型打分第 index 好的出法（不含不出，超出就绕回），连续按提示时 UI 让 index 递增 |
 
 每个回复：`{"ok", "error"?, "event"?, "state", "hint"?}`，state 字段见 `core/src/session.cpp` 的 `Session::state()`。
 另有 `debug_setup / debug_eval / debug_play` 三个测试命令，供对照脚本使用。
@@ -74,13 +78,31 @@ Godot 只发命令、只按返回的 state 渲染，不包含任何规则判断�
 
 随机一家先开始，依次选择叫地主或不叫。有人叫了之后，排在他后面、还没表态的人可以抢地主。
 如果有人抢，最先叫的人还有最后一次抢回来的机会。最后叫或抢的人当地主，每抢一次倍数 ×2。
-三家都不叫就重新发牌。总倍数 = 2^(抢地主次数 + 炸弹数)。
+三家都不叫就重新发牌。
+
+叫完地主后翻开底牌，阶段变成 `doubling`：底牌倍数为对子 ×2、三条 ×3、单王 ×2、双王 ×4，
+同时满足几条时只取最高的一条。然后两个农民先、地主最后，依次选择加倍或不加倍。
+`state.multiplier` 是公共倍数 = 2^(抢地主次数 + 炸弹数) × 底牌倍数，`state.doubles` 是每家是否加倍。
+农民和地主之间按 底分 × 公共倍数 × 地主加倍 × 该农民加倍 结算，地主的输赢是和两个农民结算的总和
+（UI 显示的"倍数"就是自己这一局的倍数）。AI 加倍：农民看叫地主模型分数 > 0.3，地主看出牌模型对
+开局最佳出法的估值 > 0.3（各约两到三成的牌会加倍，这些牌实测胜率约 83%）。
+
+出牌 AI 取模型估值最高的出法，但四带二 / 四带两对要比别的出法高出 0.05 才会选，避免为了多甩几张牌拆炸弹。
+AI 的输入里有"另外两家手牌的合集"（记牌就能算出来），但不知道具体在谁手里，见 `docs/adr/0001`。
 
 AI 用叫地主模型给 17 张手牌打分，分数 > 0.2 叫，> 0.4 抢（模型作者的阈值）。
 用我们的出牌模型实测（1500 局）：分数 < −1 的手牌当地主只赢 8%，0.2~0.4 赢 54%，> 1 赢 86%，
 所以这个分数和我们的出牌模型是匹配的。
 
 模型通过 Godot 的 FileAccess 读成字节再交给 ONNX Runtime，所以导出后打包在 .pck/.apk 里也能用。
+
+## 牌谱
+
+每局结束后，完整记录（三家起手牌、叫地主、加倍、每一手出牌、结果）写到 `user://logs/`，保留最近 50 局。
+（桌面版在 `~/.local/share/godot/app_userdata/DouZero 斗地主/logs/`；手机上用
+`adb exec-out run-as com.shfang.douzero ls files/logs` 查看，`cat files/logs/<文件名>` 取出。）
+
+点积分可以看积分记录：每局的时间、身份、胜负、倍数和得失分，存在 `user://save.cfg`，保留最近 100 局。
 
 ## 验证
 
@@ -90,6 +112,11 @@ uv run pytest -q                              # Python 参照测试 + C++ 核心
 uv run python scripts/check_cpp.py 300        # 300 局逐步对照：合法动作、模型打分、局面完全一致
 uv run python scripts/validate_models.py 300  # 模型对战随机：地主 ~99%，农民 ~99%
 godot --path game -- --autotest               # 通过真实 UI 打一局并截图到 user://autotest/
+godot --path game -- --autotest --select      # 选牌回归：拖选 99987、点掉 8、打出后不应残留选中
+godot --path game -- --autotest --timeout     # 倒计时：叫地主、加倍、出牌三个阶段都等到超时
+godot --path game -- --autotest --settings    # 设置暂停/继续、重新开始（二次确认）、积分记录、返回键退出确认
+godot --path game -- --autotest --fxdemo      # 依次播放各种特效并截图
+godot --path game --resolution 1600x720 -- --phone   # 按手机比例和手机边距看布局
 ```
 
 ## 模型来源
