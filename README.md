@@ -1,7 +1,8 @@
-# DouZero 斗地主
+# 棋牌合集
 
-人类玩家 + 两个 DouZero AI 的离线斗地主。规则和 AI 都在 **C++ 算法核心**（`core/`，以 GDExtension 形式加载）里，
-Godot（`game/`）只负责界面和交互。
+离线单机棋牌合集，都是玩家对 AI：斗地主（两个 DouZero AI）已完成，五子棋、象棋在做（见 GLOSSARY.md）。
+规则和 AI 都在 **C++ 算法核心**（`core/`，以 GDExtension 形式加载）里，Godot（`game/`）只负责界面和交互。
+安卓包名 `com.oasis.qipai`，导出到 `dist/qipai.apk`。
 
 ```text
 core/              算法核心（C++）：规则 + 特征编码 + ONNX 推理 + 对局流程
@@ -103,8 +104,8 @@ AI 用叫地主模型给 17 张手牌打分，分数 > 0.2 叫，> 0.4 抢（模
 ## 牌谱
 
 每局结束后，完整记录（三家起手牌、叫地主、加倍、每一手出牌、结果）写到 `user://logs/`，保留最近 50 局。
-（桌面版在 `~/.local/share/godot/app_userdata/DouZero 斗地主/logs/`；手机上用
-`adb exec-out run-as com.shfang.douzero ls files/logs` 查看，`cat files/logs/<文件名>` 取出。）
+（桌面版在 `~/.local/share/godot/app_userdata/棋牌合集/logs/`；手机上用
+`adb exec-out run-as com.oasis.qipai ls files/logs` 查看，`cat files/logs/<文件名>` 取出。）
 
 点积分可以看积分记录：每局的时间、身份、胜负、倍数和得失分，存在 `user://save.cfg`，保留最近 100 局。
 
