@@ -11,6 +11,7 @@ core/              算法核心（C++）：规则 + 特征编码 + ONNX 推理 +
   src/policy.*     ONNX Runtime 推理：每个合法动作打分，取最大值
   src/session.*    一局游戏：发牌、叫地主、出牌、胜负；UI 牌 id（0..53，带花色）<-> 点数
   src/gomoku.*     五子棋：规则、AI（五格窗口打分 + alpha-beta，按难度限深度、加失误）、人机对局
+  src/xiangqi.*    象棋：人机对局和简化的和棋规则；走法、合法性和 AI 用 ElephantEye（third_party/eleeye）
   src/core.*       唯一入口：JSON 请求 -> JSON 回复
   gdextension/     Godot 扩展 DouZeroCore（编译到 game/bin/）
   cli/             douzero-cli：stdin/stdout JSON-lines，用于测试和对照
@@ -93,6 +94,21 @@ Godot 只发命令、只按返回的 state 渲染，不包含任何规则判断�
 用过悔棋或提示，state 里的 `assisted` 变为 true（困难档的胜局不计战绩）。
 `gomoku_setup / gomoku_debug_step` 是测试命令（`reference/tests/test_gomoku.py`）。
 
+象棋的命令以 `xiangqi_` 开头，坐标 (x, y)：x 是红方从左数的第几路（0..8），y 从黑方底线往下数（0..9）。
+state 里 `board` 90 格，红方大写、黑方小写的 FEN 字母（`K A B N R C P`），空格是 `""`；轮到玩家时
+`legal` 列出全部合法着法 `[fx, fy, tx, ty]`，UI 据此标出可走的点。
+
+| cmd | 参数 | 说明 |
+|---|---|---|
+| `xiangqi_new` | `human: 0 红 \| 1 黑`, `level: 0..2` | 开新局，红先 |
+| `xiangqi_play` | `move: [fx, fy, tx, ty]` | 玩家走子 |
+| `xiangqi_step` | | AI 走一步 |
+| `xiangqi_undo` | | 悔棋：撤回玩家上一步和 AI 随后的一步 |
+| `xiangqi_hint` | | 提示：`hint: [fx, fy, tx, ty]` |
+
+结束时 `winner` 是 `red` / `black` / `draw`，`reason` 是 将死、困毙、长将、三次重复局面、60 回合未吃子、
+双方都无进攻子力 之一。`xiangqi_setup {fen, moves?} / xiangqi_debug_step` 是测试命令（`reference/tests/test_xiangqi.py`）。
+
 座位：0 = 我（下方），1 = 下家（右），2 = 上家（左），按 0→1→2 轮流出牌。
 
 ### 叫地主（欢乐斗地主 叫/抢）
@@ -148,3 +164,7 @@ DouZero WP（Winning Percentage）预训练模型：<https://huggingface.co/pale
 用 DouZero 自对弈数据监督训练；`reference/scripts/export_bid_model.py` 负责下载和转换。
 DouZero 官方没有公开叫地主模型（官网演示的叫地主走的是私有服务器接口）。
 规则与编码代码来自 <https://github.com/kwai/DouZero>（Apache-2.0）。
+
+象棋引擎：ElephantEye 象眼 <https://github.com/xqbase/eleeye>（LGPL-2.1），`core/fetch_deps.sh` 下载到
+`core/third_party/eleeye/`，编译时打开 `CCHESS_A3800`（不带 UCCI 循环和开局库，作为库链接进核心）。
+各难度只调它的搜索深度 / 时间、局面知识和随机性，见 `docs/adr/0002`。

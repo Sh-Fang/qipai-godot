@@ -5,7 +5,8 @@
 namespace dz {
 
 Core::Core(std::unique_ptr<Policy> policy)
-    : policy_(std::move(policy)), session_(*policy_, std::random_device{}()), gomoku_(std::random_device{}()) {}
+    : policy_(std::move(policy)), session_(*policy_, std::random_device{}()), gomoku_(std::random_device{}()),
+      xiangqi_(std::random_device{}()) {}
 
 // gomoku_new {human: 1 黑 | 2 白, level: 0..2, seed?} · gomoku_play {x, y} · gomoku_step ·
 // gomoku_undo · gomoku_hint (-> "hint": [x, y]) · gomoku_state
@@ -34,6 +35,33 @@ json Core::handle_gomoku(const std::string& cmd, const json& req, json& resp) {
     return gomoku_.state();
 }
 
+// xiangqi_new {human: 0 红 | 1 黑, level: 0..2, seed?} · xiangqi_play {move: [fx, fy, tx, ty]} ·
+// xiangqi_step · xiangqi_undo · xiangqi_hint (-> "hint": [fx, fy, tx, ty]) · xiangqi_state
+// Test hooks: xiangqi_setup {fen, moves?, human, level} · xiangqi_debug_step {level}
+json Core::handle_xiangqi(const std::string& cmd, const json& req, json& resp) {
+    if (cmd == "xiangqi_new") {
+        if (req.contains("seed")) xiangqi_.reseed(req["seed"].get<uint64_t>());
+        xiangqi_.new_game(req.value("human", 0), req.value("level", 0));
+    } else if (cmd == "xiangqi_state") {
+    } else if (cmd == "xiangqi_play") {
+        resp["event"] = xiangqi_.play(req.at("move").get<xiangqi::Move>());
+    } else if (cmd == "xiangqi_step") {
+        resp["event"] = xiangqi_.step();
+    } else if (cmd == "xiangqi_undo") {
+        resp["event"] = xiangqi_.undo();
+    } else if (cmd == "xiangqi_hint") {
+        resp["hint"] = xiangqi_.hint();
+    } else if (cmd == "xiangqi_debug_step") {
+        resp["event"] = xiangqi_.force_step(req.value("level", 0));
+    } else if (cmd == "xiangqi_setup") {
+        xiangqi_.setup(req.at("fen").get<std::string>(), req.value("moves", std::vector<xiangqi::Move>{}),
+                       req.value("human", 0), req.value("level", 0));
+    } else {
+        throw RuleError("unknown cmd " + cmd);
+    }
+    return xiangqi_.state();
+}
+
 json Core::handle(const json& req) {
     const std::string cmd = req.value("cmd", "");
     json resp = {{"id", req.value("id", json(nullptr))}, {"ok", true}, {"event", nullptr}};
@@ -44,6 +72,16 @@ json Core::handle(const json& req) {
             resp["ok"] = false;
             resp["error"] = e.what();
             resp["state"] = gomoku_.state();
+        }
+        return resp;
+    }
+    if (cmd.rfind("xiangqi_", 0) == 0) {
+        try {
+            resp["state"] = handle_xiangqi(cmd, req, resp);
+        } catch (const std::exception& e) {
+            resp["ok"] = false;
+            resp["error"] = e.what();
+            resp["state"] = xiangqi_.state();
         }
         return resp;
     }

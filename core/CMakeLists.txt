@@ -31,10 +31,21 @@ set_target_properties(onnxruntime PROPERTIES
     IMPORTED_LOCATION "${ORT_DIR}/lib/libonnxruntime.so"
     INTERFACE_INCLUDE_DIRECTORIES "${ORT_DIR}/include")
 
+# ElephantEye (象眼, LGPL-2.1, fetched by fetch_deps.sh): the 象棋 engine, built as a
+# library. CCHESS_A3800 drops its UCCI loop: the best move is left in Search.mvResult.
+set(ELEEYE_SRC third_party/eleeye/eleeye)
+add_library(eleeye STATIC
+    ${ELEEYE_SRC}/pregen.cpp ${ELEEYE_SRC}/position.cpp ${ELEEYE_SRC}/genmoves.cpp
+    ${ELEEYE_SRC}/hash.cpp ${ELEEYE_SRC}/movesort.cpp ${ELEEYE_SRC}/preeval.cpp
+    ${ELEEYE_SRC}/evaluate.cpp ${ELEEYE_SRC}/search.cpp)
+target_compile_definitions(eleeye PUBLIC CCHESS_A3800)
+target_compile_options(eleeye PRIVATE -w)  # 2000s-era code, warnings aren't ours to fix
+target_include_directories(eleeye SYSTEM PUBLIC third_party/eleeye)
+
 add_library(douzero STATIC
-    src/rules.cpp src/game.cpp src/policy.cpp src/session.cpp src/gomoku.cpp src/core.cpp)
+    src/rules.cpp src/game.cpp src/policy.cpp src/session.cpp src/gomoku.cpp src/xiangqi.cpp src/core.cpp)
 target_include_directories(douzero PUBLIC src third_party)
-target_link_libraries(douzero PUBLIC onnxruntime)
+target_link_libraries(douzero PUBLIC onnxruntime PRIVATE eleeye)
 target_compile_options(douzero PRIVATE -Wall -Wextra)
 
 add_executable(douzero-cli cli/main.cpp)

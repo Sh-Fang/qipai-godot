@@ -6,6 +6,7 @@ cd "$(dirname "$0")/third_party"
 
 ORT_VERSION=1.31.0
 GODOT_CPP_COMMIT=8070599885b6df675fcad033dd032ce44be2b850  # master, ships extension_api-4-7.json
+ELEEYE_COMMIT=61c2f8b45c1acf8ec99326746ca0f8ab9bc8305f  # ElephantEye 象眼 (LGPL-2.1), the 象棋 AI
 
 if [ ! -d onnxruntime/linux-x64 ]; then
     mkdir -p onnxruntime
@@ -30,6 +31,16 @@ if [ ! -d godot-cpp ]; then
     git init -q godot-cpp
     git -C godot-cpp fetch -q --depth 1 https://github.com/godotengine/godot-cpp.git "$GODOT_CPP_COMMIT"
     git -C godot-cpp checkout -q FETCH_HEAD
+fi
+
+# only the engine (eleeye/) and its helpers (base/), plus the licence
+if [ ! -d eleeye ]; then
+    tmp=$(mktemp -d)
+    curl -fsSL "https://github.com/xqbase/eleeye/archive/${ELEEYE_COMMIT}.tar.gz" | tar xz -C "$tmp"
+    mkdir -p eleeye
+    mv "$tmp/eleeye-${ELEEYE_COMMIT}/eleeye" "$tmp/eleeye-${ELEEYE_COMMIT}/base" \
+        "$tmp/eleeye-${ELEEYE_COMMIT}/LICENSE" eleeye/
+    rm -rf "$tmp"
 fi
 
 echo "deps ready in $(pwd)"
