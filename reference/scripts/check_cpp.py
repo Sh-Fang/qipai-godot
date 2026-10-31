@@ -2,7 +2,7 @@
 
 Bidding: both cores get the same deal and first bidder; at every bid we compare
 the 叫地主 model score, the event and the whole UI state (the human seat bids
-at random so 抢地主 paths get exercised). A redeal ends the check, since each
+at random so 抢地主 paths get exercised), then the same through 加倍. A redeal ends the check, since each
 core reshuffles with its own RNG.
 
 Card play: both cores get the same deal and landlord, then at every move we compare the
@@ -49,13 +49,17 @@ def check_bidding(seed: int, policy: DouZeroPolicy, cpp: CppCore) -> int:
     py = GameSession(policy, seed=seed)
     cpp("debug_setup", hands=py.hands, bottom=py.bottom, bid_start=py.bid_start)
     bids = 0
-    while py.phase == "bidding":
+    while py.phase in ("bidding", "doubling"):
         seat = py.current_seat
-        score = policy.bid_score(C.ranks_of(py.hands[seat]))
-        assert abs(score - cpp("debug_eval")["bid_score"]) < TOLERANCE, f"seed {seed}: bid scores differ"
+        if py.phase == "bidding":
+            score = policy.bid_score(C.ranks_of(py.hands[seat]))
+            assert abs(score - cpp("debug_eval")["bid_score"]) < TOLERANCE, f"seed {seed}: bid scores differ"
         if seat == HUMAN:
             want = rng.random() < 0.5
-            py_event, reply = py.human_bid(want), cpp("bid", call=want)
+            if py.phase == "bidding":
+                py_event, reply = py.human_bid(want), cpp("bid", call=want)
+            else:
+                py_event, reply = py.human_double(want), cpp("double", double=want)
         else:
             py_event, reply = py.step(), cpp("step")
         assert normalized(py_event) == reply["event"], f"seed {seed} bid {bids}: events differ"
@@ -71,8 +75,7 @@ def check_game(seed: int, policy: DouZeroPolicy, cpp: CppCore) -> tuple[int, flo
     py = GameSession(policy, seed=seed)
     landlord = seed % 3
     cpp("debug_setup", hands=py.hands, bottom=py.bottom, landlord=landlord)
-    py.bids[landlord] = "call"
-    py._start_play(landlord)
+    py._setup_playing(landlord)
 
     steps, worst = 0, 0.0
     while py.phase != "over":

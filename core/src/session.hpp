@@ -11,6 +11,11 @@
 // the stake. If nobody calls, the cards are redealt. AIs decide with the
 // 叫地主 model (Policy::bid_score).
 //
+// Then the bottom cards are revealed (底牌倍数: a pair x2, three of a kind x3,
+// one joker x2, both jokers x4, the best one counts) and each player chooses
+// 加倍 or not, farmers first and the landlord last. A farmer's double only
+// affects that farmer's settlement with the landlord; the landlord's affects both.
+//
 // The session never advances AI turns on its own: the UI calls step() once per
 // AI action so it can animate each move.
 #pragma once
@@ -19,6 +24,7 @@
 #include <random>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -48,6 +54,13 @@ CardIds take_ids(const CardIds& hand, const Move& ranks);
 // AI bids when the 叫地主 model score is above these (the model authors' values).
 constexpr float CALL_THRESHOLD = 0.2f;
 constexpr float ROB_THRESHOLD = 0.4f;
+// AI 加倍: a farmer when the 叫地主 score of their 17 cards is above FARMER_DOUBLE, the
+// landlord when the model's value of their best opening move is above LANDLORD_DOUBLE.
+constexpr float FARMER_DOUBLE = 0.3f;  // ~20% of farmer hands, which win ~83%
+constexpr float LANDLORD_DOUBLE = 0.3f;  // ~25% of landlord hands, which win ~83%
+
+// 底牌倍数 of three bottom cards: {multiplier, name}, {1, ""} when nothing special.
+std::pair<int, std::string> bottom_bonus(const CardIds& bottom);
 
 class Session {
 public:
@@ -58,9 +71,11 @@ public:
 
     json step();  // the AI in the current seat acts once
     json human_bid(bool call);
+    json human_double(bool want);
     json human_play(const CardIds& ids);
     json human_pass();
-    CardIds hint();
+    // The human's index-th best move by the model (wrapping around), [] if only pass.
+    CardIds hint(int index = 0);
     json state() const;
 
     // Test hooks (used by the Python cross-check): a fixed deal that either
@@ -79,8 +94,12 @@ private:
     void start_bidding();
     const char* bid_stage() const { return caller_ < 0 ? "call" : "rob"; }
     json bid(int seat, bool want);
-    void start_play(int landlord_seat);
-    json apply(int seat, const Move& ranks);
+    void start_doubling(int landlord_seat);
+    json do_double(int seat, bool want);
+    bool ai_double(int seat);
+    void start_play();
+    // `ids`: the exact cards (the human's pick); empty = lowest suits realizing `ranks`.
+    json apply(int seat, const Move& ranks, CardIds ids = {});
     int seat_of(int pos) const { return (landlord_seat_ + pos) % 3; }
 
     Policy& policy_;
@@ -95,6 +114,10 @@ private:
     int candidate_ = -1;               // landlord if bidding ended now
     int rob_count_ = 0;
     bool caller_last_chance_ = false;
+    std::array<int, 3> doubles_{};     // 加倍 per seat: -1 undecided, 0 no, 1 yes
+    std::vector<int> double_queue_;    // seats still to choose 加倍, in order
+    int bottom_mult_ = 1;
+    std::string bottom_kind_;
     std::array<CardIds, 3> hands_;
     CardIds bottom_;
     std::array<json, 3> display_;  // what each seat shows on the table (null = nothing)

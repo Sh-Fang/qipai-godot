@@ -56,6 +56,8 @@ def test_protocol_full_game(cpp, seed):
             reply = cpp("step")
         elif st["phase"] == "bidding":
             reply = cpp("bid", call=True)
+        elif st["phase"] == "doubling":
+            reply = cpp("double", double=seed % 2 == 0)
         else:
             hint = cpp("hint")["hint"]
             reply = cpp("play", cards=hint) if hint else cpp("pass")
@@ -69,7 +71,12 @@ def test_protocol_full_game(cpp, seed):
 def test_protocol_errors(cpp):
     st = cpp("new_game", seed=1)["state"]
     while not (st["phase"] == "playing" and st["current_seat"] == 0):
-        st = (cpp("step") if st["current_seat"] != 0 else cpp("bid", call=True))["state"]
+        if st["current_seat"] != 0:
+            st = cpp("step")["state"]
+        elif st["phase"] == "doubling":
+            st = cpp("double", double=False)["state"]
+        else:
+            st = cpp("bid", call=True)["state"]
     assert raw(cpp, "play", cards=[])["error"] == "请先选牌"
     assert raw(cpp, "play", cards=[99])["error"] == "选中的牌不在手里"
     hand = st["my_hand"]
@@ -80,3 +87,10 @@ def test_protocol_errors(cpp):
         assert raw(cpp, "pass")["error"] == "你必须出牌"
     assert raw(cpp, "step")["error"] == "现在轮到你"
     assert raw(cpp, "nope")["ok"] is False
+
+
+def test_protocol_plays_the_chosen_suits(cpp):
+    st = cpp("debug_setup", hands=[[1, 0, 4] + list(range(8, 22)), list(range(22, 39)), list(range(39, 54))[:15] + [52, 53]],
+             bottom=[], landlord=0)["state"]
+    reply = cpp("play", cards=[1])  # ♥3, while ♠3 (id 0) is also in hand
+    assert reply["event"]["cards"] == [1] and 0 in reply["state"]["my_hand"] and 1 not in reply["state"]["my_hand"]

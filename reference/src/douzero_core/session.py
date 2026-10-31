@@ -11,6 +11,11 @@ to rob back. The last player to call/rob becomes landlord; every rob doubles
 the stake. If nobody calls, the cards are redealt. AIs decide with the
 叫地主 model (ai.DouZeroPolicy.bid_score).
 
+Then the bottom cards are revealed (底牌倍数: a pair x2, three of a kind x3,
+one joker x2, both jokers x4, the best one counts) and each player chooses
+加倍 or not, farmers first and the landlord last. A farmer's double only
+affects that farmer's settlement with the landlord; the landlord's affects both.
+
 The session never advances AI turns on its own: the UI calls step() once per
 AI action so it can animate each move.
 """
@@ -53,6 +58,26 @@ def move_type_name(ranks) -> str:
 
 CALL_THRESHOLD = 0.2  # thresholds used by the model's authors
 ROB_THRESHOLD = 0.4
+# AI 加倍: a farmer when the 叫地主 score of their 17 cards is above FARMER_DOUBLE, the
+# landlord when the model's value of their best opening move is above LANDLORD_DOUBLE.
+FARMER_DOUBLE = 0.3
+LANDLORD_DOUBLE = 0.3
+
+
+def bottom_bonus(bottom: list[int]) -> tuple[int, str]:
+    """底牌倍数 of the three bottom cards: (multiplier, name), (1, "") if nothing special."""
+    jokers = sum(c >= 52 for c in bottom)
+    ranks = [C.card_rank(c) for c in bottom if c < 52]
+    most = max((ranks.count(r) for r in ranks), default=0)
+    if jokers == 2:
+        return 4, "双王"
+    if most == 3:
+        return 3, "三条"
+    if jokers == 1:
+        return 2, "单王"
+    if most == 2:
+        return 2, "对子"
+    return 1, ""
 
 
 class GameSession:
@@ -95,6 +120,9 @@ class GameSession:
         self.candidate = -1   # landlord if bidding ended now
         self.rob_count = 0
         self.caller_last_chance = False
+        self.doubles = [None, None, None]  # 加倍 per seat
+        self.double_queue = []
+        self.bottom_mult, self.bottom_kind = 1, ""
         self.current_seat = self.bid_queue[0]
 
     @property
@@ -127,16 +155,19 @@ class GameSession:
         if self.bid_queue:
             self.current_seat = self.bid_queue[0]
         else:
-            self._start_play(self.candidate)
+            self._start_doubling(self.candidate)
         return event
 
     def _ai_bid(self, seat: int) -> bool:
         score = self.policy.bid_score(C.ranks_of(self.hands[seat]))
         return score > (CALL_THRESHOLD if self.bid_stage == "call" else ROB_THRESHOLD)
 
-    def _start_play(self, landlord_seat: int):
+    def _start_doubling(self, landlord_seat: int):
+        """The landlord takes the (revealed) bottom cards and the play env is set up,
+        so the landlord's 加倍 can look at the model's value of their opening."""
         self.landlord_seat = landlord_seat
         self.hands[landlord_seat] = C.sort_ids(self.hands[landlord_seat] + self.bottom)
+        self.bottom_mult, self.bottom_kind = bottom_bonus(self.bottom)
         self.players = {p: _ScriptedPlayer() for p in ("landlord", "landlord_up", "landlord_down")}
         self.env = GameEnv(self.players)
         self.env.card_play_init({
@@ -145,8 +176,36 @@ class GameSession:
             "landlord_up": C.ranks_of(self.hands[(landlord_seat + 2) % 3]),
             "three_landlord_cards": C.ranks_of(self.bottom),
         })
+        self.phase = "doubling"
+        self.double_queue = [(landlord_seat + 1) % 3, (landlord_seat + 2) % 3, landlord_seat]
+        self.current_seat = self.double_queue[0]
+
+    def _double(self, seat: int, want: bool) -> dict:
+        self.double_queue.pop(0)
+        self.doubles[seat] = want
+        event = {"seat": seat, "type": "double", "action": "double" if want else "no_double"}
+        if self.double_queue:
+            self.current_seat = self.double_queue[0]
+        else:
+            self._start_play()
+        return event
+
+    def _ai_double(self, seat: int) -> bool:
+        if seat != self.landlord_seat:
+            return self.policy.bid_score(C.ranks_of(self.hands[seat])) > FARMER_DOUBLE
+        return float(max(self.policy.evaluate(self.infoset))) > LANDLORD_DOUBLE
+
+    def _start_play(self):
         self.phase = "playing"
-        self.current_seat = landlord_seat
+        self.current_seat = self.landlord_seat
+
+    def _setup_playing(self, landlord_seat: int):
+        """Test hook: skip bidding and 加倍, landlord_seat leads."""
+        self.bids[landlord_seat] = "call"
+        self._start_doubling(landlord_seat)
+        self.doubles = [False, False, False]
+        self.double_queue = []
+        self._start_play()
 
     # ---- playing -----------------------------------------------------------
 
@@ -157,10 +216,11 @@ class GameSession:
     def _must_lead(self) -> bool:
         return [] not in self.infoset.legal_actions
 
-    def _apply(self, seat: int, ranks: list[int]) -> dict:
+    def _apply(self, seat: int, ranks: list[int], ids: list[int] | None = None) -> dict:
+        """`ids`: the exact cards (the human's pick); None = lowest suits realizing `ranks`."""
         if self._must_lead():
             self.display = [None, None, None]
-        ids = C.take_ids(self.hands[seat], ranks) if ranks else []
+        ids = C.sort_ids(ids) if ids else (C.take_ids(self.hands[seat], ranks) if ranks else [])
         self.players[self.position_of(seat)].action = sorted(ranks)
         self.env.step()
         for c in ids:
@@ -187,12 +247,19 @@ class GameSession:
             raise RuleError("现在轮到你")
         if self.phase == "bidding":
             return self._bid(seat, self._ai_bid(seat))
+        if self.phase == "doubling":
+            return self._double(seat, self._ai_double(seat))
         return self._apply(seat, self.policy.act(self.infoset))
 
     def human_bid(self, call: bool) -> dict:
         if self.phase != "bidding" or self.current_seat != HUMAN:
             raise RuleError("现在不能叫地主")
         return self._bid(HUMAN, call)
+
+    def human_double(self, want: bool) -> dict:
+        if self.phase != "doubling" or self.current_seat != HUMAN:
+            raise RuleError("现在不能加倍")
+        return self._double(HUMAN, want)
 
     def human_play(self, card_ids: list[int]) -> dict:
         if self.phase != "playing" or self.current_seat != HUMAN:
@@ -206,7 +273,7 @@ class GameSession:
             if md.get_move_type(ranks)["type"] == md.TYPE_15_WRONG:
                 raise RuleError("不是合法牌型")
             raise RuleError("管不上")
-        return self._apply(HUMAN, ranks)
+        return self._apply(HUMAN, ranks, list(card_ids))
 
     def human_pass(self) -> dict:
         if self.phase != "playing" or self.current_seat != HUMAN:
@@ -215,18 +282,19 @@ class GameSession:
             raise RuleError("你必须出牌")
         return self._apply(HUMAN, [])
 
-    def hint(self) -> list[int]:
-        """Card ids the landlord/farmer model would play in the human's seat."""
+    def hint(self, index: int = 0) -> list[int]:
+        """The human's index-th best move by the model (wrapping around), [] if only pass."""
         if self.phase != "playing" or self.current_seat != HUMAN:
             return []
-        ranks = self.policy.act(self.infoset)
-        return C.take_ids(self.hands[HUMAN], ranks) if ranks else []
+        moves = [m for m in self.policy.ranked(self.infoset) if m]
+        return C.take_ids(self.hands[HUMAN], moves[index % len(moves)]) if moves else []
 
     # ---- view --------------------------------------------------------------
 
     def state(self) -> dict:
         """Everything the UI may show to the human player."""
-        playing = self.phase in ("playing", "over")
+        revealed = self.phase != "bidding"
+        bombs = self.env.get_bomb_num() if revealed else 0
         return {
             "phase": self.phase,
             "current_seat": self.current_seat,
@@ -234,13 +302,19 @@ class GameSession:
             "bids": self.bids,
             "bid_stage": self.bid_stage if self.phase == "bidding" else None,
             "rob_count": self.rob_count,
-            "multiplier": 2 ** (self.rob_count + (self.env.get_bomb_num() if playing else 0)),
+            # shared by everyone: robs, bottom cards and bombs (加倍 is per player, see doubles)
+            "multiplier": 2 ** (self.rob_count + bombs) * self.bottom_mult,
+            "bottom_mult": self.bottom_mult,
+            "bottom_kind": self.bottom_kind,
+            "doubles": self.doubles,
             "my_hand": self.hands[HUMAN],
             "card_counts": [len(h) for h in self.hands],
-            "bottom_cards": self.bottom if playing else [],
+            "bottom_cards": self.bottom if revealed else [],
             "display": self.display,
             "must_lead": self.phase == "playing" and self._must_lead(),
-            "bomb_num": self.env.get_bomb_num() if playing else 0,
+            # false when the player to act can only pass (nothing beats the last play)
+            "has_move": self.phase == "playing" and any(self.infoset.legal_actions),
+            "bomb_num": bombs,
             "winner": self.winner,
             "human_won": None if self.winner is None else
                 (self.winner == "landlord") == (self.landlord_seat == HUMAN),

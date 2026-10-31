@@ -3,7 +3,7 @@ import pytest
 from douzero_core import cards as C
 from douzero_core.ai import DouZeroPolicy
 from douzero_core.server import handle
-from douzero_core.session import HUMAN, GameSession, RuleError
+from douzero_core.session import HUMAN, GameSession, RuleError, bottom_bonus
 
 
 @pytest.fixture(scope="module")
@@ -19,6 +19,8 @@ def drive(session: GameSession, human_call=True):
             events.append(session.step())
         elif session.phase == "bidding":
             events.append(session.human_bid(human_call))
+        elif session.phase == "doubling":
+            events.append(session.human_double(human_call))
         else:
             hint = session.hint()
             events.append(session.human_play(hint) if hint else session.human_pass())
@@ -55,6 +57,8 @@ def test_rule_errors(policy):
     while not (s.phase == "playing" and s.current_seat == HUMAN):
         if s.current_seat != HUMAN:
             s.step()
+        elif s.phase == "doubling":
+            s.human_double(False)
         else:
             s.human_bid(True)
     with pytest.raises(RuleError):
@@ -119,10 +123,49 @@ def test_bidding_passers_cannot_rob(policy):
 def test_bidding_last_seat_call_ends_bidding(policy):
     s, log = scripted_bidding(policy, 2, [[False], [True], [False]])
     assert log == [(2, "pass"), (0, "pass"), (1, "call")]
-    assert s.landlord_seat == 1 and s.phase == "playing"
+    assert s.landlord_seat == 1 and s.phase == "doubling"
 
 
 def test_bidding_all_pass_redeals(policy):
     s, log = scripted_bidding(policy, 0, [[False], [False], [False]])
     assert log[-1] == (2, "pass")
     assert s.phase == "bidding" and s.bids == [None, None, None] and s.current_seat == 0
+
+
+@pytest.mark.parametrize("bottom, expected", [
+    ([0, 4, 8], (1, "")), ([0, 1, 8], (2, "对子")), ([0, 1, 2], (3, "三条")),
+    ([0, 52, 8], (2, "单王")), ([0, 1, 53], (2, "单王")), ([52, 53, 8], (4, "双王")),
+])
+def test_bottom_bonus(bottom, expected):
+    assert bottom_bonus(bottom) == expected
+
+
+def test_doubling_order_and_multiplier(policy):
+    s, _ = scripted_bidding(policy, 1, [[False], [True], [False]])  # seat 1 is landlord
+    assert s.phase == "doubling" and s.double_queue == [2, 0, 1] and s.current_seat == 2
+    s._ai_double = lambda seat: seat == 2
+    log = [s.step(), s.human_double(True), s.step()]
+    assert [(e["seat"], e["action"]) for e in log] == [(2, "double"), (0, "double"), (1, "no_double")]
+    st = s.state()
+    assert st["phase"] == "playing" and st["current_seat"] == 1 and st["doubles"] == [True, False, True]
+    assert st["multiplier"] == st["bottom_mult"] and st["bottom_cards"] == s.bottom
+    with pytest.raises(RuleError):
+        s.human_double(True)
+
+
+def test_hint_cycles_through_moves(policy):
+    s = GameSession(policy, seed=5)
+    s._setup_playing(HUMAN)
+    first, second = s.hint(0), s.hint(1)
+    assert first and second and first != second
+    assert s.hint(len(s.policy.ranked(s.infoset))) == first  # no pass while leading: wraps
+
+
+def test_human_play_uses_the_chosen_suits(policy):
+    s = GameSession(policy, seed=2)
+    s._setup_playing(HUMAN)
+    rank = next(r for r in set(C.ranks_of(s.hands[HUMAN])) if C.ranks_of(s.hands[HUMAN]).count(r) >= 2)
+    same = [c for c in s.hands[HUMAN] if C.card_rank(c) == rank]
+    pick = same[-1]  # not the lowest suit, which take_ids would choose
+    event = s.human_play([pick])
+    assert event["cards"] == [pick] and pick not in s.hands[HUMAN] and same[0] in s.hands[HUMAN]

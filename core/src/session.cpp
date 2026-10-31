@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <map>
 #include <numeric>
+#include <tuple>
 
 namespace dz {
 
@@ -30,6 +31,22 @@ CardIds sort_ids(CardIds ids) {
         return std::pair(card_rank(a), card_suit(a)) < std::pair(card_rank(b), card_suit(b));
     });
     return ids;
+}
+
+std::pair<int, std::string> bottom_bonus(const CardIds& bottom) {
+    std::map<int, int> counts;
+    int jokers = 0;
+    for (int id : bottom) {
+        if (id >= 52) ++jokers;
+        else ++counts[card_rank(id)];
+    }
+    int most = 0;
+    for (auto [rank, n] : counts) most = std::max(most, n);
+    if (jokers == 2) return {4, "双王"};
+    if (most == 3) return {3, "三条"};
+    if (jokers == 1) return {2, "单王"};
+    if (most == 2) return {2, "对子"};
+    return {1, ""};
 }
 
 CardIds take_ids(const CardIds& hand, const Move& ranks) {
@@ -63,6 +80,10 @@ void Session::start_bidding() {
     caller_ = candidate_ = -1;
     rob_count_ = 0;
     caller_last_chance_ = false;
+    doubles_ = {-1, -1, -1};
+    double_queue_.clear();
+    bottom_mult_ = 1;
+    bottom_kind_.clear();
     current_seat_ = bid_queue_.front();
 }
 
@@ -103,24 +124,49 @@ json Session::bid(int seat, bool want) {
         }
     }
     if (!bid_queue_.empty()) current_seat_ = bid_queue_.front();
-    else start_play(candidate_);
+    else start_doubling(candidate_);
     return event;
 }
 
-void Session::start_play(int landlord_seat) {
+// The landlord takes the bottom cards (revealed to all) and the play env is set up,
+// so the landlord's 加倍 can look at the model's value of their opening.
+void Session::start_doubling(int landlord_seat) {
     landlord_seat_ = landlord_seat;
     hands_[landlord_seat].insert(hands_[landlord_seat].end(), bottom_.begin(), bottom_.end());
     hands_[landlord_seat] = sort_ids(hands_[landlord_seat]);
+    std::tie(bottom_mult_, bottom_kind_) = bottom_bonus(bottom_);
     std::array<Move, 3> by_position;
     for (int pos = 0; pos < 3; ++pos) by_position[pos] = ranks_of(hands_[seat_of(pos)]);
     env_.init(by_position);
-    phase_ = "playing";
-    current_seat_ = landlord_seat;
+    phase_ = "doubling";
+    double_queue_ = {seat_of(1), seat_of(2), landlord_seat};
+    current_seat_ = double_queue_.front();
 }
 
-json Session::apply(int seat, const Move& ranks) {
+json Session::do_double(int seat, bool want) {
+    double_queue_.erase(double_queue_.begin());
+    doubles_[seat] = want ? 1 : 0;
+    json event = {{"seat", seat}, {"type", "double"}, {"action", want ? "double" : "no_double"}};
+    if (!double_queue_.empty()) current_seat_ = double_queue_.front();
+    else start_play();
+    return event;
+}
+
+bool Session::ai_double(int seat) {
+    if (seat != landlord_seat_) return bid_score(seat) > FARMER_DOUBLE;
+    auto values = policy_.evaluate(env_);
+    return *std::max_element(values.begin(), values.end()) > LANDLORD_DOUBLE;
+}
+
+void Session::start_play() {
+    phase_ = "playing";
+    current_seat_ = landlord_seat_;
+}
+
+json Session::apply(int seat, const Move& ranks, CardIds ids) {
     if (env_.must_lead()) display_ = {};
-    CardIds ids = ranks.empty() ? CardIds{} : take_ids(hands_[seat], ranks);
+    if (ids.empty() && !ranks.empty()) ids = take_ids(hands_[seat], ranks);
+    ids = sort_ids(ids);
     env_.step(ranks);
     for (int c : ids) hands_[seat].erase(std::find(hands_[seat].begin(), hands_[seat].end(), c));
     display_[seat] = {{"cards", ids}, {"pass", ids.empty()}};
@@ -142,12 +188,18 @@ json Session::step() {
     if (current_seat_ == HUMAN) throw RuleError("现在轮到你");
     if (phase_ == "bidding")
         return bid(current_seat_, bid_score(current_seat_) > (caller_ < 0 ? CALL_THRESHOLD : ROB_THRESHOLD));
+    if (phase_ == "doubling") return do_double(current_seat_, ai_double(current_seat_));
     return apply(current_seat_, policy_.act(env_));
 }
 
 json Session::human_bid(bool call) {
     if (phase_ != "bidding" || current_seat_ != HUMAN) throw RuleError("现在不能叫地主");
     return bid(HUMAN, call);
+}
+
+json Session::human_double(bool want) {
+    if (phase_ != "doubling" || current_seat_ != HUMAN) throw RuleError("现在不能加倍");
+    return do_double(HUMAN, want);
 }
 
 json Session::human_play(const CardIds& ids) {
@@ -162,7 +214,7 @@ json Session::human_play(const CardIds& ids) {
         if (move_type(ranks).type == TYPE_15_WRONG) throw RuleError("不是合法牌型");
         throw RuleError("管不上");
     }
-    return apply(HUMAN, ranks);
+    return apply(HUMAN, ranks, ids);
 }
 
 json Session::human_pass() {
@@ -171,17 +223,22 @@ json Session::human_pass() {
     return apply(HUMAN, {});
 }
 
-CardIds Session::hint() {
+CardIds Session::hint(int index) {
     if (phase_ != "playing" || current_seat_ != HUMAN) return {};
-    Move ranks = policy_.act(env_);
-    return ranks.empty() ? CardIds{} : take_ids(hands_[HUMAN], ranks);
+    std::vector<Move> moves;
+    for (const Move& m : policy_.ranked(env_))
+        if (!m.empty()) moves.push_back(m);
+    if (moves.empty()) return {};
+    int n = static_cast<int>(moves.size());
+    return take_ids(hands_[HUMAN], moves[((index % n) + n) % n]);
 }
 
 json Session::state() const {
-    const bool playing = phase_ == "playing" || phase_ == "over";
-    json bids = json::array(), counts = json::array(), display = json::array();
+    const bool revealed = phase_ != "bidding";
+    json bids = json::array(), counts = json::array(), display = json::array(), doubles = json::array();
     for (int s = 0; s < 3; ++s) {
         bids.push_back(bids_[s].empty() ? json(nullptr) : json(bids_[s]));
+        doubles.push_back(doubles_[s] < 0 ? json(nullptr) : json(doubles_[s] == 1));
         counts.push_back(hands_[s].size());
         display.push_back(display_[s]);
     }
@@ -198,13 +255,20 @@ json Session::state() const {
         {"bids", bids},
         {"bid_stage", phase_ == "bidding" ? json(bid_stage()) : json(nullptr)},
         {"rob_count", rob_count_},
-        {"multiplier", 1 << (rob_count_ + (playing ? env_.bomb_num() : 0))},
+        // shared by everyone: robs, bottom cards and bombs (加倍 is per player, see doubles)
+        {"multiplier", (1 << (rob_count_ + (revealed ? env_.bomb_num() : 0))) * bottom_mult_},
+        {"bottom_mult", bottom_mult_},
+        {"bottom_kind", bottom_kind_},
+        {"doubles", doubles},
         {"my_hand", hands_[HUMAN]},
         {"card_counts", counts},
-        {"bottom_cards", playing ? bottom_ : CardIds{}},
+        {"bottom_cards", revealed ? bottom_ : CardIds{}},
         {"display", display},
         {"must_lead", phase_ == "playing" && env_.must_lead()},
-        {"bomb_num", playing ? env_.bomb_num() : 0},
+        // false when the player to act can only pass (nothing beats the last play)
+        {"has_move", phase_ == "playing" && std::any_of(env_.legal().begin(), env_.legal().end(),
+                                                        [](const Move& m) { return !m.empty(); })},
+        {"bomb_num", revealed ? env_.bomb_num() : 0},
         {"winner", winner},
         {"human_won", human_won},
         {"hands", hands},
@@ -218,9 +282,12 @@ void Session::setup(const std::array<CardIds, 3>& hands, const CardIds& bottom, 
     bottom_ = sort_ids(bottom);
     bid_start_ = bid_start;
     start_bidding();
-    if (landlord_seat >= 0) {
+    if (landlord_seat >= 0) {  // skip bidding and 加倍
         bids_[landlord_seat] = "call";
-        start_play(landlord_seat);
+        start_doubling(landlord_seat);
+        doubles_ = {0, 0, 0};
+        double_queue_.clear();
+        start_play();
     }
 }
 

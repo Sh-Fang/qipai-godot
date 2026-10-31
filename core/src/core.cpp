@@ -19,12 +19,14 @@ json Core::handle(const json& req) {
             resp["event"] = session_.step();
         } else if (cmd == "bid") {
             resp["event"] = session_.human_bid(req.value("call", false));
+        } else if (cmd == "double") {
+            resp["event"] = session_.human_double(req.value("double", false));
         } else if (cmd == "play") {
             resp["event"] = session_.human_play(req.value("cards", CardIds{}));
         } else if (cmd == "pass") {
             resp["event"] = session_.human_pass();
         } else if (cmd == "hint") {
-            resp["hint"] = session_.hint();
+            resp["hint"] = session_.hint(req.value("index", 0));
         } else if (cmd == "debug_setup") {
             session_.setup(req.at("hands").get<std::array<CardIds, 3>>(), req.at("bottom").get<CardIds>(),
                            req.value("landlord", -1), req.value("bid_start", 0));

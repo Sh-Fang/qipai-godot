@@ -1,6 +1,6 @@
 """JSON-lines TCP server: the Godot client sends one request per line.
 
-Request:  {"id": 1, "cmd": "new_game" | "state" | "step" | "bid" | "play" | "pass" | "hint", ...}
+Request:  {"id": 1, "cmd": "new_game" | "state" | "step" | "bid" | "double" | "play" | "pass" | "hint", ...}
 Response: {"id": 1, "ok": true, "event": {...} | null, "state": {...}, "hint": [...]}
           {"id": 1, "ok": false, "error": "管不上", "state": {...}}
 """
@@ -26,12 +26,14 @@ def handle(session: GameSession, req: dict) -> dict:
             resp["event"] = session.step()
         elif cmd == "bid":
             resp["event"] = session.human_bid(bool(req.get("call")))
+        elif cmd == "double":
+            resp["event"] = session.human_double(bool(req.get("double")))
         elif cmd == "play":
             resp["event"] = session.human_play([int(c) for c in req.get("cards", [])])
         elif cmd == "pass":
             resp["event"] = session.human_pass()
         elif cmd == "hint":
-            resp["hint"] = session.hint()
+            resp["hint"] = session.hint(int(req.get("index", 0)))
         else:
             raise RuleError(f"unknown cmd {cmd!r}")
     except RuleError as e:
