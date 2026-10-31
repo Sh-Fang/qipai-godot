@@ -13,6 +13,7 @@
 - `kenney/`：Kenney《Casino Audio》1.1，CC0（`kenney/License.txt`），取自
   https://opengameart.org/content/54-casino-sound-effects-cards-dice-chips 。
   五子棋落子用 `chip-lay-*`，悔棋收子用 `chips-collide-1`。
+- `guofeng/`：五子棋、象棋的胜/负/和音效，由 `tools/jingles.py` 用五声音阶合成的拨弦声，本项目自制。
 
 ## 单独提供的背景音乐
 
