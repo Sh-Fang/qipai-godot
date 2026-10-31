@@ -301,7 +301,7 @@ json Session::state() const {
         {"winner", s.winner >= 0 ? json(names[s.winner]) : json(nullptr)},
         {"reason", s.reason},
         {"human_won", s.winner == s.human},
-        {"in_check", s.winner < 0 && s.pos.LastMove().ChkChs > 0},
+        {"in_check", s.pos.LastMove().ChkChs > 0},  // still true once mated, for the board
         {"last", s.moves.empty() ? json(nullptr) : move_json(s.moves.back())},
         {"move_count", s.moves.size()},
         {"can_undo", s.winner < 0 && human_moved},

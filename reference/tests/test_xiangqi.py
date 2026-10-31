@@ -59,6 +59,7 @@ def test_checkmate(cpp):
     assert reply["event"]["check"]
     st = reply["state"]
     assert st["phase"] == "over" and st["winner"] == "red" and st["reason"] == "将死" and st["human_won"]
+    assert st["in_check"]  # the mated king still shows as in check
     assert raw(cpp, "xiangqi_undo")["error"] == "对局已结束"
 
 
