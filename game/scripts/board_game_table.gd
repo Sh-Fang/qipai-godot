@@ -23,6 +23,8 @@ var _human := 0  # the side value sent to the core, one of _sides()
 var _record: Array = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]  # per 难度: 胜, 负, 和
 var _game := 0  # bumped by every new game, so an AI turn left over from the last one stops
 var _busy := false  # a request (or the AI's turn) is under way
+var _board_home := Vector2.ZERO  # where the layout put the board; shakes move it about this
+var _shaking: Tween
 
 var _record_pill: Label
 var _chip: Button
@@ -76,6 +78,18 @@ func _outcome() -> String:
 ## Extra line on the result panel ("" for none).
 func _result_detail() -> String:
     return ""
+
+## Sound as a game starts, and as 悔棋 takes stones or pieces back (paths for Sfx.play).
+func _start_sound() -> String:
+    return ""
+
+func _undo_sound() -> String:
+    return ""
+
+## Start the board's entrance for a new game; how long it runs (the AI waits that long
+## before an opening move).
+func _intro() -> float:
+    return 0.0
 
 ## The stone or piece standing for `side` on a player card.
 func _draw_side(_canvas: CanvasItem, _center: Vector2, _radius: float, _side) -> void:
@@ -170,6 +184,7 @@ func _layout() -> void:
     var w := h * _board_aspect()
     board.size = Vector2(w, h)
     board.position = Vector2((size.x - w) / 2, e.y + 16)
+    _board_home = board.position
     var left := Rect2(e.x + 16, e.y + 12, board.position.x - e.x - 40, size.y - e.y - e.w - 24)
     var right := Rect2(board.position.x + w + 24, e.y + 12, 0, left.size.y)
     right.size.x = size.x - e.z - 16 - right.position.x
@@ -218,8 +233,18 @@ func _new_game() -> void:
     _game += 1
     _busy = false
     _show_hint(null)
+    var game := _game
     _apply(await Core.request(_prefix() + "_new", {"human": _human, "level": _level}))
+    if game != _game:
+        return
+    if _start_sound() != "":
+        Sfx.play(_start_sound())
+    var wait := _intro()
     if _ai_to_move():
+        if wait > 0.0:
+            await get_tree().create_timer(wait, false).timeout
+            if game != _game:
+                return
         _ai_turn()
 
 func _apply(reply: Dictionary) -> bool:
@@ -277,7 +302,8 @@ func _ai_turn() -> void:
 func _on_undo() -> void:
     if not _my_turn() or not state["can_undo"]:
         return
-    Sfx.play("kenney/chips-collide-1")
+    if _undo_sound() != "":
+        Sfx.play(_undo_sound())
     _show_hint(null)
     _apply(await Core.request(_prefix() + "_undo"))
 
@@ -317,6 +343,15 @@ func _finish() -> void:
     _result.show_result(outcome, detail)
 
 # ---- rendering ----------------------------------------------------------------
+
+## Shake the board, `amount` pixels at first and settling over `time` seconds.
+func _shake(amount: float, time := 0.25) -> void:
+    if _shaking:
+        _shaking.kill()
+    _shaking = create_tween()
+    _shaking.tween_method(func(k: float):
+        board.position = _board_home + Vector2(randf_range(-1, 1), randf_range(-1, 1)) * amount * (1.0 - k),
+            0.0, 1.0, time)
 
 func _render() -> void:
     if state.is_empty():

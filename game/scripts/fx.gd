@@ -1,7 +1,7 @@
 class_name Fx
 extends Control
 ## Full-screen, click-through effects layer: big move-type banners, particle bursts,
-## screen flashes, confetti and cards flying across the table.
+## screen flashes and edge glows, confetti and cards flying across the table.
 
 const ROCKET := preload("res://art/fx/rocket.png")
 const ROCKET_FLAME := preload("res://art/fx/rocket_flame.png")
@@ -70,8 +70,8 @@ func streak(text: String, color: Color, y: float) -> void:
     tail.position = Vector2(l.size.x, l.size.y / 2)
     l.add_child(tail)
 
-## One-shot spray of sparks.
-func burst(at: Vector2, colors: Array, amount := 60, speed := 420.0) -> void:
+## One-shot spray of sparks; `glow` adds a flash where they start.
+func burst(at: Vector2, colors: Array, amount := 60, speed := 420.0, glow := true) -> void:
     var p := CPUParticles2D.new()
     p.position = at
     p.one_shot = true
@@ -94,16 +94,18 @@ func burst(at: Vector2, colors: Array, amount := 60, speed := 420.0) -> void:
     add_child(p)
     p.emitting = true
     p.finished.connect(p.queue_free)
-    var glow := Sprite2D.new()
-    glow.texture = _spark
-    glow.position = at
-    glow.modulate = Color(colors[0], 0.9)
-    glow.scale = Vector2(2, 2)
-    add_child(glow)
-    var t := glow.create_tween().set_parallel()
-    t.tween_property(glow, "scale", Vector2(9, 9), 0.35).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-    t.tween_property(glow, "modulate:a", 0.0, 0.35)
-    t.chain().tween_callback(glow.queue_free)
+    if not glow:
+        return
+    var flare := Sprite2D.new()
+    flare.texture = _spark
+    flare.position = at
+    flare.modulate = Color(colors[0], 0.9)
+    flare.scale = Vector2(2, 2)
+    add_child(flare)
+    var t := flare.create_tween().set_parallel()
+    t.tween_property(flare, "scale", Vector2(9, 9), 0.35).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+    t.tween_property(flare, "modulate:a", 0.0, 0.35)
+    t.chain().tween_callback(flare.queue_free)
 
 ## Expanding shock-wave circle (bombs).
 func ring(at: Vector2, color: Color, radius := 260.0, duration := 0.5) -> void:
@@ -157,6 +159,22 @@ func flash(color := Color(1, 1, 1, 0.7), duration := 0.35) -> void:
     add_child(r)
     var t := r.create_tween()
     t.tween_property(r, "modulate:a", 0.0, duration)
+    t.tween_callback(r.queue_free)
+
+## The screen's edges glow `color` for a moment, the middle left clear (绝杀).
+func edge_glow(color: Color, hold := 0.5) -> void:
+    var r := ColorRect.new()
+    r.material = ShaderMaterial.new()
+    r.material.shader = load("res://shaders/edge_glow.gdshader")
+    r.material.set_shader_parameter("tint", color)
+    r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    r.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    r.modulate.a = 0.0
+    add_child(r)
+    var t := r.create_tween()
+    t.tween_property(r, "modulate:a", 1.0, 0.15)
+    t.tween_interval(hold)
+    t.tween_property(r, "modulate:a", 0.0, 0.9)
     t.tween_callback(r.queue_free)
 
 ## Missile for 王炸: launches from `from` (the seat that played it), climbs off the top
