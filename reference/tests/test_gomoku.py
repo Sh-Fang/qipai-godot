@@ -123,3 +123,15 @@ def test_harder_levels_win_more(cpp):
     for strong, weak in [(1, 0), (2, 1)]:
         wins = sum(selfplay(cpp, weak, strong, seed) == WHITE for seed in range(20))
         assert wins >= 12, (strong, weak, wins)
+
+
+def test_easy_usually_blocks_an_open_three(cpp):
+    """简单 slips now and then, but doesn't ignore a plain open three."""
+    moves = [[7, 7], [6, 8], [8, 7], [8, 8], [9, 7]]  # black 7..9 on row 7, both ends open
+    blocks = 0
+    for seed in range(30):
+        cpp("gomoku_new", human=BLACK, level=0, seed=seed)
+        cpp("gomoku_setup", moves=moves, human=BLACK, level=0)
+        ev = cpp("gomoku_step")["event"]
+        blocks += (ev["x"], ev["y"]) in [(6, 7), (10, 7), (5, 7), (11, 7)]
+    assert blocks >= 21, blocks

@@ -12,6 +12,7 @@ constexpr std::array<std::array<int, 2>, 4> DIRS = {{{1, 0}, {0, 1}, {1, 1}, {1,
 // Value of a five-window holding k stones of one colour and none of the other.
 constexpr std::array<long long, 6> WINDOW = {0, 1, 12, 150, 1800, 0};
 constexpr long long WIN = 1'000'000'000;
+constexpr long long TEMPO = 15;  // tenths: the side to move's windows count 1.5x
 
 bool inside(int x, int y) { return x >= 0 && x < N && y >= 0 && y < N; }
 
@@ -139,7 +140,8 @@ std::vector<int> Ai::ordered(const Board& board, int color, int width, double de
 long long Ai::negamax(Board& board, int color, int depth, long long alpha, long long beta, int ply,
                       int width) {
     const int opp = other(color);
-    if (depth == 0) return board.score(color) - board.score(opp);
+    // whoever moves next gets to extend their threats first
+    if (depth == 0) return board.score(color) * TEMPO / 10 - board.score(opp);
     if (board.full()) return 0;
     if ((ply & 7) == 0 && now_ms() > deadline_) timed_out_ = true;
     if (timed_out_) return 0;
