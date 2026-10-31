@@ -14,6 +14,9 @@ extends Node
 ## `-- --autotest --gomoku` opens 五子棋 instead and plays a game by tapping each 提示
 ## (taking one move back on the way), then checks the result, the 战绩, switching to
 ## 执白 (the AI opens) and 返回大厅.
+## `-- --autotest --xiangqi` opens 象棋 and plays a few moves by tapping each 提示
+## (piece, then square), takes one back, mates from a set-up position for the result
+## and the 战绩, then switches to 执黑 (the AI opens, the board turns round).
 
 const DEAL_WAIT := 2.0
 
@@ -33,6 +36,9 @@ func _ready() -> void:
     _screenshot("lobby")
     if OS.get_cmdline_user_args().has("--gomoku"):
         _gomoku_check()
+        return
+    if OS.get_cmdline_user_args().has("--xiangqi"):
+        _xiangqi_check()
         return
     await _open_doudizhu()
     if OS.get_cmdline_user_args().has("--cards"):
@@ -164,11 +170,7 @@ func _settings_check() -> void:
     get_tree().quit()
 
 func _gomoku_check() -> void:
-    app._lobby.choose("gomoku")
-    while app.game == null:
-        await get_tree().process_frame
-    var g: Node = app.game
-    await get_tree().create_timer(1.0).timeout
+    var g: Node = await _open_board_game("gomoku")
     _screenshot("gomoku_start")
     var board: GomokuBoard = g.board
     var moves := 0
@@ -221,6 +223,84 @@ func _gomoku_check() -> void:
             " moves=", moves, " undo_ok=", undo_ok, " result_shown=", result_shown, " record=", record,
             " ai_first=", ai_first, " left=", left)
     get_tree().quit()
+
+func _xiangqi_check() -> void:
+    var g: Node = await _open_board_game("xiangqi")
+    _screenshot("xiangqi_start")
+    var board: XiangqiBoard = g.board
+    var tap := func(x: int, y: int):
+        var at: Vector2 = board.global_position + board.square_center(x, y)
+        _drag(at, at)
+    var moves := 0
+    var undo_ok := false
+    while moves < 6 and g.state.get("phase") == "playing":
+        var waited := 0.0
+        while not g._my_turn() and waited < 10.0:
+            await get_tree().create_timer(0.1).timeout
+            waited += 0.1
+        if moves == 3 and not undo_ok:
+            var before := int(g.state["move_count"])
+            await g._on_undo()
+            undo_ok = int(g.state["move_count"]) == before - 2
+            moves += 1
+            continue
+        await g._on_hint()
+        var h: Array = board.hint
+        tap.call(int(h[0]), int(h[1]))  # pick the piece up
+        await get_tree().create_timer(0.3).timeout
+        if moves == 1:
+            _screenshot("xiangqi_picked")
+        tap.call(int(h[2]), int(h[3]))  # and put it down
+        moves += 1
+        await get_tree().create_timer(0.3).timeout
+    while not g._my_turn():
+        await get_tree().create_timer(0.1).timeout
+    _screenshot("xiangqi_midgame")
+    var played := int(g.state["move_count"])
+    # a mate in one, through the real taps: 车 down the h-file to the back rank
+    g._game += 1  # as a new game would: any AI turn still pending is void
+    g._busy = false
+    g._apply(await Core.request("xiangqi_setup", {"fen": "4k4/R8/9/9/9/9/9/9/8R/3K5 w", "human": 0, "level": 0}))
+    tap.call(8, 8)
+    await get_tree().create_timer(0.2).timeout
+    tap.call(8, 0)
+    await get_tree().create_timer(0.4).timeout
+    _screenshot("xiangqi_mate")
+    var waited := 0.0
+    while not g._result.visible and waited < 5.0:
+        await get_tree().create_timer(0.1).timeout
+        waited += 0.1
+    await get_tree().create_timer(0.4).timeout
+    _screenshot("xiangqi_result")
+    var result_shown: bool = g._result.visible
+    var record: Array = g._record[0].duplicate()
+    g._result.box.get_child(-1).get_child(1).pressed.emit()  # 再来一局
+    await get_tree().create_timer(0.5).timeout
+    g._chip.pressed.emit()
+    g._setup._sides[1].pressed.emit()
+    g._setup.box.get_child(-1).pressed.emit()  # 开始新局 as black
+    await get_tree().create_timer(2.5).timeout
+    _screenshot("xiangqi_black")
+    var ai_first: bool = int(g.state["move_count"]) == 1 and board.flipped and g._human == 1
+    get_tree().root.propagate_notification(NOTIFICATION_WM_GO_BACK_REQUEST)
+    app._confirm._ok.pressed.emit()
+    await get_tree().create_timer(1.0).timeout
+    print("AUTOTEST DONE xiangqi played=", played, " undo_ok=", undo_ok, " result_shown=", result_shown,
+            " record=", record, " ai_first=", ai_first, " left=", app.game == null)
+    get_tree().quit()
+
+## Open a 五子棋 / 象棋 table at 简单 with the first side, whatever an earlier run saved.
+func _open_board_game(id: String) -> Node:
+    app._lobby.choose(id)
+    while app.game == null:
+        await get_tree().process_frame
+    var g: Node = app.game
+    await get_tree().create_timer(0.3).timeout
+    g._level = 0
+    g._human = g._sides()[0][1]
+    await g._new_game()
+    await get_tree().create_timer(0.7).timeout
+    return g
 
 ## Press at `from`, move to `to`, release, through the real input pipeline.
 func _drag(from: Vector2, to: Vector2) -> void:

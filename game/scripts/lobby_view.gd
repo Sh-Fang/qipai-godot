@@ -135,7 +135,7 @@ func _choose(card: GameCard) -> void:
         game_chosen.emit(card.id))
 
 ## One game in the lobby: a framed panel with the game's emblem and its name, drawn in
-## code (斗地主 a fan of cards, 五子棋 a diagonal five on a board, 象棋 a 帥 piece).
+## code (斗地主 a fan of cards, 五子棋 a diagonal five on a board, 象棋 a 帅 piece).
 class GameCard extends Button:
     const SIZE := Vector2(300, 330)
     const NAME_SIZE := 44
@@ -217,14 +217,4 @@ class GameCard extends Button:
                 Color(1, 1, 1, 0.35 if black else 0.8), true, -1.0, true)
 
     func _draw_xiangqi(c: Vector2) -> void:
-        var r := 76.0
-        draw_circle(c + Vector2(3, 5), r, Color(0, 0, 0, 0.4), true, -1.0, true)
-        draw_circle(c, r, Color(0.62, 0.42, 0.22), true, -1.0, true)
-        draw_circle(c, r - 6, Color(0.95, 0.83, 0.6), true, -1.0, true)
-        var red := Color(0.75, 0.12, 0.1)
-        draw_circle(c, r - 16, red, false, 3.0, true)
-        var size_px := 84
-        var font := UiTheme.bold
-        var text_w := font.get_string_size("帥", HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x
-        var baseline := c.y + (font.get_ascent(size_px) - font.get_descent(size_px)) / 2
-        draw_string(font, Vector2(c.x - text_w / 2, baseline), "帥", HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, red)
+        XiangqiBoard.draw_piece(self, c, 76.0, "K")

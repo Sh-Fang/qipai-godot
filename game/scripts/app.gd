@@ -14,7 +14,8 @@ extends Control
 ## the gear (see CORNER).
 
 ## Scene of each game the lobby can open.
-const GAMES := {"doudizhu": "res://scenes/doudizhu.tscn", "gomoku": "res://scenes/gomoku.tscn"}
+const GAMES := {"doudizhu": "res://scenes/doudizhu.tscn", "gomoku": "res://scenes/gomoku.tscn",
+        "xiangqi": "res://scenes/xiangqi.tscn"}
 ## Extra room kept clear along the screen edges on phones (rounded corners, camera
 ## cutout), on top of whatever the system reports as unsafe.
 const PHONE_PAD := Vector2(40, 10)

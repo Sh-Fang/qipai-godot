@@ -35,6 +35,8 @@ game/              Godot 4.7 项目（只做 UI）
   scripts/board_game_table.gd   棋类共用的棋桌：两侧栏、AI 回合、悔棋 / 提示、战绩和存档；
                            match_setup_view.gd / record_view.gd / result_view.gd 对局设置（难度、执子）、战绩、结算
   scenes/gomoku.tscn       五子棋；脚本在 scripts/gomoku/：gomoku.gd 棋桌、gomoku_board.gd 棋盘和棋子
+  scenes/xiangqi.tscn      象棋；脚本在 scripts/xiangqi/：xiangqi.gd 棋桌（点子、再点落点）、xiangqi_board.gd 棋盘和棋子
+  fonts/xiangqi.ttf        棋子和楚河汉界用的霞鹜文楷（只含用到的 15 个字）
 reference/         原 Python 核心，作为 C++ 核心的参照（DouZero 原版 env，Apache-2.0）
   scripts/check_cpp.py     逐步对比两边的叫地主、合法动作、模型打分、事件和局面
   scripts/export_bid_model.py  下载叫地主模型权重并转成 game/models/bid.onnx
@@ -154,6 +156,7 @@ godot --path game -- --autotest --select      # 选牌回归：拖选 99987、�
 godot --path game -- --autotest --timeout     # 倒计时：叫地主、加倍、出牌三个阶段都等到超时
 godot --path game -- --autotest --settings    # 设置暂停/继续、重新开始（二次确认）、积分记录、返回键（返回大厅、退出确认、再进斗地主）
 godot --path game -- --autotest --gomoku      # 五子棋：按提示下完一局（中途悔棋）、结算、战绩、改执白、返回大厅
+godot --path game -- --autotest --xiangqi     # 象棋：按提示走几步（中途悔棋）、绝杀结算、战绩、改执黑后棋盘翻转
 godot --path game -- --autotest --fxdemo      # 依次播放各种特效并截图
 godot --path game --resolution 1600x720 -- --phone   # 按手机比例和手机边距看布局
 ```
@@ -169,3 +172,6 @@ DouZero 官方没有公开叫地主模型（官网演示的叫地主走的是私
 象棋引擎：ElephantEye 象眼 <https://github.com/xqbase/eleeye>（LGPL-2.1），`core/fetch_deps.sh` 下载到
 `core/third_party/eleeye/`，编译时打开 `CCHESS_A3800`（不带 UCCI 循环和开局库，作为库链接进核心）。
 各难度只调它的搜索深度 / 时间、局面知识和随机性，见 `docs/adr/0002`。
+
+棋子字体：霞鹜文楷 TC（LXGW WenKai TC，SIL OFL 1.1，`game/fonts/OFL.txt`），用 Google Fonts 的
+`text=` 参数只取了 `帅将仕士相象马车炮兵卒楚河汉界` 这 15 个字的粗体。要加字就带上新字重新取一次。
