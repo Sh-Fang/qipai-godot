@@ -5,11 +5,14 @@ extends Control
 
 signal closed
 
+const GROUP := &"modals"  # every modal, so Android back can close whichever is open
+
 var box: VBoxContainer
 var _panel: PanelContainer
 
 func _ready() -> void:
     process_mode = Node.PROCESS_MODE_ALWAYS
+    add_to_group(GROUP)
     set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     hide()
 

@@ -23,10 +23,12 @@ game/              Godot 4.7 项目（只做 UI）
     card_view.gd           单张牌（显示顺序：大的在左）
     hand_view.gd           手牌排列与选牌
     seat_view.gd 座位头像、clock_view.gd 回合倒计时闹钟、history_view.gd 积分记录
-  scripts/autotest.gd      自动打一局并截图的冒烟测试（还有选牌、超时、设置、特效几种模式）
-  scripts/home_view.gd     首页（加载进度条 → 开始游戏）
+  scripts/autotest.gd      从大厅进斗地主自动打一局并截图的冒烟测试（还有选牌、超时、设置、特效几种模式）
+  scenes/app.tscn          入口：scripts/app.gd 加载核心、打开游戏、返回大厅，管设置、返回键和手机安全边距
+  scripts/lobby_view.gd    大厅（加载进度条 → 游戏卡片）
   scripts/modal.gd         弹窗底座（压暗牌桌、暂停游戏）；settings_view.gd 设置（音效、音乐、重新开始）；
-                           quit_view.gd 退出确认（安卓返回键、关窗口）
+                           confirm_view.gd 返回大厅 / 退出确认（安卓返回键、关窗口）
+  scripts/save.gd          存档 user://save.cfg（设置和各游戏各占一节）；round_button.gd 角落的圆形按钮
 reference/         原 Python 核心，作为 C++ 核心的参照（DouZero 原版 env，Apache-2.0）
   scripts/check_cpp.py     逐步对比两边的叫地主、合法动作、模型打分、事件和局面
   scripts/export_bid_model.py  下载叫地主模型权重并转成 game/models/bid.onnx
@@ -116,7 +118,7 @@ uv run python scripts/validate_models.py 300  # 模型对战随机：地主 ~99%
 godot --path game -- --autotest               # 通过真实 UI 打一局并截图到 user://autotest/
 godot --path game -- --autotest --select      # 选牌回归：拖选 99987、点掉 8、打出后不应残留选中
 godot --path game -- --autotest --timeout     # 倒计时：叫地主、加倍、出牌三个阶段都等到超时
-godot --path game -- --autotest --settings    # 设置暂停/继续、重新开始（二次确认）、积分记录、返回键退出确认
+godot --path game -- --autotest --settings    # 设置暂停/继续、重新开始（二次确认）、积分记录、返回键（返回大厅、退出确认、再进斗地主）
 godot --path game -- --autotest --fxdemo      # 依次播放各种特效并截图
 godot --path game --resolution 1600x720 -- --phone   # 按手机比例和手机边距看布局
 ```

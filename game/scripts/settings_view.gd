@@ -1,7 +1,7 @@
 class_name SettingsView
 extends Modal
-## 设置: the gear button in the top-right corner opens this panel and pauses the game.
-## 继续游戏 or a tap outside closes it. 重新开始 asks again before abandoning the game.
+## 设置: the gear in the top-right corner opens this panel and pauses the game.
+## 继续游戏 or a tap outside closes it. 重新开始 (in a game) asks again first.
 
 signal sound_changed(on: bool)
 signal music_changed(on: bool)
@@ -10,6 +10,7 @@ signal restart_confirmed
 var _main: VBoxContainer
 var _confirm: VBoxContainer
 var _restart: Button
+var _note: Label
 var _sound: Switch
 var _music: Switch
 
@@ -34,11 +35,10 @@ func _build() -> void:
     _confirm.hide()
     box.add_child(_confirm)
     _confirm.add_child(title("重新开始？"))
-    var warn := Label.new()
-    warn.text = "放弃当前牌局，本局不计分"
-    warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    warn.add_theme_font_size_override("font_size", 26)
-    _confirm.add_child(warn)
+    _note = Label.new()
+    _note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    _note.add_theme_font_size_override("font_size", 26)
+    _confirm.add_child(_note)
     var choice := HBoxContainer.new()
     choice.add_theme_constant_override("separation", 20)
     choice.add_child(button("取消", &"GrayButton", _cancel_restart))
@@ -60,11 +60,14 @@ func _row(text: String) -> Switch:
     _main.add_child(row)
     return sw
 
-## `in_game`: offer 重新开始 (not on the home screen, where there is no game to restart).
-func open(sound_on: bool, music_on: bool, in_game: bool) -> void:
+## `in_game`: offer 重新开始 (not in the 大厅, where there is no game to restart).
+## `note`: what restarting loses, shown when asking again ("" when nothing is lost).
+func open(sound_on: bool, music_on: bool, in_game: bool, note: String) -> void:
     _sound.set_on(sound_on)
     _music.set_on(music_on)
     _restart.visible = in_game
+    _note.text = note
+    _note.visible = note != ""
     _main.show()
     _confirm.hide()
     popup()
@@ -80,31 +83,6 @@ func _cancel_restart() -> void:
     _confirm.hide()
     _main.show()
     relayout()
-
-## The gear for the top-right corner.
-static func make_button() -> Button:
-    var b := Gear.new()
-    b.accessibility_name = "设置"
-    b.custom_minimum_size = Vector2(64, 64)
-    b.focus_mode = Control.FOCUS_NONE
-    b.flat = true
-    return b
-
-## Round dark button with a gear drawn on it.
-class Gear extends Button:
-    func _draw() -> void:
-        var c := size / 2
-        var r := minf(size.x, size.y) / 2
-        draw_circle(c, r, Color(0, 0, 0, 0.45 if not is_hovered() else 0.6), true, -1.0, true)
-        draw_circle(c, r, Color(1, 1, 1, 0.18), false, 2.0, true)
-        var teeth := PackedVector2Array()
-        for i in 32:  # 8 teeth, each a flat top and a flat gap
-            var a: float = TAU * (i / 4) / 8.0 + [-0.2, -0.13, 0.13, 0.2][i % 4]
-            var rr := r * (0.62 if i % 4 in [1, 2] else 0.46)
-            teeth.append(c + Vector2(cos(a), sin(a)) * rr)
-        draw_colored_polygon(teeth, UiTheme.GOLD)
-        draw_polyline(teeth + PackedVector2Array([teeth[0]]), UiTheme.GOLD, 1.0, true)
-        draw_circle(c, r * 0.2, Color(0.12, 0.13, 0.18), true, -1.0, true)
 
 ## On/off switch: a pill track with a knob that slides across.
 class Switch extends Button:

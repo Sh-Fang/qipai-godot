@@ -5,7 +5,7 @@ extends Control
 ## `-- --rocket` deals the human both jokers every game (for trying the 王炸 effect).
 ## Every finished game is written to user://logs/ as a 牌谱, and its points to the 积分记录
 ## (tap the score).
-## The gear in the top-right corner opens 设置, which pauses the game: timers made here
+## Hosted by the app (scripts/app.gd), whose 设置 pauses the game: timers made here
 ## pass process_always = false so the AI, the clock and the deal all wait with it.
 
 const ME := 0
@@ -33,10 +33,6 @@ const LOG_KEEP := 50
 const HISTORY_KEEP := 100
 const PLAYED_SCALE := 0.85
 const BASE_SCORE := 10
-const SAVE_PATH := "user://save.cfg"
-## Extra room kept clear along the screen edges on phones (rounded corners, camera
-## cutout), on top of whatever the system reports as unsafe.
-const PHONE_PAD := Vector2(40, 10)
 ## How long the deal animation runs; buttons and AI moves wait for it.
 const DEAL_TIME := 17 * HandView.DEAL_GAP + 0.5
 ## Move types worth a big on-screen callout, with their colour.
@@ -73,8 +69,6 @@ var _landlord_plays := 0
 var _voices := ["male", "female", "male"]  # by seat, reshuffled every game
 var _robs := 0  # 抢地主 so far this deal, for the escalating voice lines
 var _score := 1000
-var _sound_on := true
-var _music_on := true
 var _deal_end := 0  # ticks (ms) when the current deal animation finishes
 var _turn := 0  # bumped on every event, so a new turn restarts the clock and the hint cycle
 var _hint_turn := -1
@@ -86,76 +80,40 @@ var _clock_left := -1
 var _requesting := false  # a human action is on its way to the core
 var _my_clock: ClockView
 var _bottom_tag: Label
-var _home: HomeView
-var _settings: SettingsView
 var _history: HistoryView
-var _quit: QuitView
 var _games: Array = []  # 积分记录, oldest first: {time, role, won, mult, delta}
-var _gear: Button
 var _log: Array[String] = []
 var _played := [[], [], []]  # card ids each seat played this game, for the 牌谱
 
-func _enter_tree() -> void:
-    theme = UiTheme.build()  # before children's _ready, which use its fonts
-
 func _ready() -> void:
-    _pad_edges()
+    for n in [$Score, $TopBar, $LeftSeat, $RightSeat, $MySeat, $LeftPlay, $RightPlay,
+            $MyPlay, $Actions, $Hand]:
+        App.pad(n)
     _build_extras()
     _load_save()
     _set_actions([])
     hand.selection_changed.connect(_update_play_button)
     for b in find_children("*", "Button", true, false):
         _juicy(b)
-    _home.show()
-    Sfx.music("bgm_welcome")
-    if OS.get_cmdline_user_args().has("--autotest"):
-        var bot := Node.new()
-        bot.set_script(load("res://scripts/autotest.gd"))
-        add_child(bot)
-    # the model load gives no progress of its own, so ease the bar towards 90% meanwhile
-    var bar := create_tween()
-    bar.tween_method(_home.set_progress, 0.0, 0.9, 2.0).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
-    var ok: bool = await Core.start()
-    bar.kill()
-    if not ok:
-        overlay.get_node("Label").text = "算法核心加载失败：\n" + Core.error_text()
-        overlay.show()
-        return
-    _home.loaded(_score)
-    _gear.show()
 
-## Nodes made in code: the home screen, 设置 and its gear, my turn clock and the 底牌倍数 tag.
+# ---- what the app calls (see scripts/app.gd) ----------------------------------
+
+func start() -> void:
+    _new_game()
+
+func restart() -> void:
+    _new_game()
+
+func in_progress() -> bool:
+    return not state.is_empty() and state["phase"] != "over"
+
+func forfeit_note() -> String:
+    return "放弃当前牌局，本局不计分"
+
+## Nodes made in code: the 积分记录, my turn clock and the 底牌倍数 tag.
 func _build_extras() -> void:
-    _home = HomeView.new()
-    _home.hide()
-    _home.start_pressed.connect(_new_game)
-    _home.score_pressed.connect(_on_score_pressed)
-    add_child(_home)
-    move_child(_home, overlay.get_index())  # under the error overlay
-    _gear = SettingsView.make_button()
-    _gear.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-    _gear.offset_right = -16 - _edge.z
-    _gear.offset_left = _gear.offset_right - _gear.custom_minimum_size.x
-    _gear.offset_top = 12 + _edge.y
-    _gear.offset_bottom = _gear.offset_top + _gear.custom_minimum_size.y
-    _gear.pressed.connect(_on_settings_pressed)
-    _gear.hide()  # until the core has loaded
-    add_child(_gear)
-    _settings = SettingsView.new()
-    _settings.sound_changed.connect(func(on: bool):
-        _sound_on = on
-        _apply_audio()
-        _save())
-    _settings.music_changed.connect(func(on: bool):
-        _music_on = on
-        _apply_audio()
-        _save())
-    _settings.restart_confirmed.connect(_new_game)
-    add_child(_settings)
     _history = HistoryView.new()
     add_child(_history)
-    _quit = QuitView.new()
-    add_child(_quit)
     score_label.mouse_filter = Control.MOUSE_FILTER_STOP
     score_label.gui_input.connect(func(e: InputEvent):
         if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
@@ -173,34 +131,6 @@ func _build_extras() -> void:
     _bottom_tag.hide()
     add_child(_bottom_tag)
     move_child(_bottom_tag, $TopBar.get_index() + 1)
-
-## Insets (left, top, right, bottom) the edge-anchored nodes were moved in by.
-var _edge := Vector4.ZERO
-
-## On phones, move everything anchored to a screen edge inwards, clear of rounded
-## corners and the camera cutout. `-- --phone` does the same on desktop, for checking.
-func _pad_edges() -> void:
-    if not OS.has_feature("mobile") and not OS.get_cmdline_user_args().has("--phone"):
-        return
-    var safe := Rect2(DisplayServer.get_display_safe_area())
-    var screen := Vector2(DisplayServer.screen_get_size())
-    var k := size / Vector2(get_window().size)  # screen pixels -> UI units
-    _edge = Vector4(
-            maxf(safe.position.x * k.x, 0.0) + PHONE_PAD.x,
-            maxf(safe.position.y * k.y, 0.0) + PHONE_PAD.y,
-            maxf((screen.x - safe.end.x) * k.x, 0.0) + PHONE_PAD.x,
-            maxf((screen.y - safe.end.y) * k.y, 0.0) + PHONE_PAD.y)
-    for n in [$Score, $TopBar, $LeftSeat, $RightSeat, $MySeat, $LeftPlay, $RightPlay,
-            $MyPlay, $Actions, $Hand]:
-        var c := n as Control
-        if c.anchor_left == 0.0: c.offset_left += _edge.x
-        if c.anchor_right == 0.0: c.offset_right += _edge.x
-        if c.anchor_left == 1.0: c.offset_left -= _edge.z
-        if c.anchor_right == 1.0: c.offset_right -= _edge.z
-        if c.anchor_top == 0.0: c.offset_top += _edge.y
-        if c.anchor_bottom == 0.0: c.offset_bottom += _edge.y
-        if c.anchor_top == 1.0: c.offset_top -= _edge.w
-        if c.anchor_bottom == 1.0: c.offset_bottom -= _edge.w
 
 # ---- core round-trips ---------------------------------------------------------
 
@@ -354,32 +284,9 @@ func _on_again_pressed() -> void:
     Sfx.play("click")
     await _new_game()
 
-func _on_settings_pressed() -> void:
-    Sfx.play("click")
-    _settings.open(_sound_on, _music_on, not _home.visible)
-
 func _on_score_pressed() -> void:
     Sfx.play("click")
     _history.open(_score, _games)
-
-## Quitting asks first (auto_accept_quit and quit_on_go_back are off). Android back closes
-## whichever panel is open, like any other app, and only asks once there is none.
-func _notification(what: int) -> void:
-    if _quit == null:
-        return
-    if what == NOTIFICATION_WM_CLOSE_REQUEST:
-        if not _quit.visible:
-            _ask_quit()
-    elif what == NOTIFICATION_WM_GO_BACK_REQUEST:
-        for m: Modal in [_quit, _settings, _history]:
-            if m.visible:
-                m.close()
-                return
-        _ask_quit()
-
-func _ask_quit() -> void:
-    Sfx.play("click")
-    _quit.open(not _home.visible and not result_panel.visible and not overlay.visible)
 
 func _gui_input(event: InputEvent) -> void:
     # a tap on empty table clears the selection
@@ -951,28 +858,15 @@ func _shake(strength := 8.0) -> void:
 
 # ---- persistence --------------------------------------------------------------
 
+## 斗地主's own sections of the save file: [player] score and [history] games.
 func _load_save() -> void:
-    var cfg := ConfigFile.new()
-    if cfg.load(SAVE_PATH) == OK:
-        _score = int(cfg.get_value("player", "score", _score))
-        var muted := bool(cfg.get_value("settings", "muted", false))  # before 音效/音乐 were split
-        _sound_on = bool(cfg.get_value("settings", "sound", not muted))
-        _music_on = bool(cfg.get_value("settings", "music", not muted))
-        _games = cfg.get_value("history", "games", [])
+    _score = int(Save.value("player", "score", _score))
+    _games = Save.value("history", "games", [])
     _render_score()
-    _apply_audio()
 
 func _save() -> void:
-    var cfg := ConfigFile.new()
-    cfg.set_value("player", "score", _score)
-    cfg.set_value("settings", "sound", _sound_on)
-    cfg.set_value("settings", "music", _music_on)
-    cfg.set_value("history", "games", _games)
-    cfg.save(SAVE_PATH)
+    Save.store("player", "score", _score)
+    Save.store("history", "games", _games)
 
 func _render_score() -> void:
     score_label.text = "积分 %d ›" % _score
-
-func _apply_audio() -> void:
-    Sfx.set_sound_on(_sound_on)
-    Sfx.set_music_on(_music_on)

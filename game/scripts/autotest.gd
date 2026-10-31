@@ -1,5 +1,5 @@
 extends Node
-## Smoke test: `godot --path game -- --autotest` presses 开始游戏 on the home screen, plays
+## Smoke test: `godot --path game -- --autotest` opens 斗地主 from the 大厅, plays
 ## one game through the real UI (bid, double, then follow the hint each turn), saves
 ## screenshots to user://autotest/, and quits.
 ## `-- --autotest --fxdemo` instead fires each table effect once and screenshots it.
@@ -9,25 +9,26 @@ extends Node
 ## that nothing is left selected.
 ## `-- --autotest --settings` opens 设置 mid-game and checks that the game holds still,
 ## then restarts through the confirmation, opens the 积分记录 and walks Android back through
-## closing it, asking 退出游戏？ and cancelling.
+## closing it, 返回大厅？ (cancel, then go), the 大厅's 退出游戏？ (cancel) and opening
+## 斗地主 again.
 
 const DEAL_WAIT := 2.0
 
-var main: Node
+var app: App
+var main: Node  # the 斗地主 table, once opened
 var _shot := 0
 
 func _ready() -> void:
-    main = get_parent()
+    app = get_parent()
     DirAccess.make_dir_recursive_absolute("user://autotest")
     for i in 3:  # the first frames haven't been drawn yet
         await get_tree().process_frame
     _screenshot("loading")
-    while not main._home._start.visible:  # still loading the core
+    while not app._gear.visible:  # still loading the core
         await get_tree().process_frame
-    await get_tree().create_timer(0.6).timeout
-    _screenshot("home")
-    main._home._on_start()
-    await get_tree().create_timer(0.5).timeout
+    await get_tree().create_timer(0.8).timeout
+    _screenshot("lobby")
+    await _open_doudizhu()
     if OS.get_cmdline_user_args().has("--cards"):
         _card_gallery()
     elif OS.get_cmdline_user_args().has("--select"):
@@ -38,6 +39,13 @@ func _ready() -> void:
         _fx_demo()
     else:
         _loop(OS.get_cmdline_user_args().has("--timeout"))
+
+func _open_doudizhu() -> void:
+    app._lobby.choose("doudizhu")
+    while app.game == null:
+        await get_tree().process_frame
+    main = app.game
+    await get_tree().create_timer(0.5).timeout
 
 ## Jokers, a 10 and a few faces at hand size on a plain backdrop, for checking card art.
 func _card_gallery() -> void:
@@ -97,22 +105,22 @@ func _select_check() -> void:
 
 func _settings_check() -> void:
     await get_tree().create_timer(DEAL_WAIT).timeout
-    main._on_settings_pressed()
+    app._on_settings_pressed()
     var before := JSON.stringify(main.state)
     var clock: float = main._clock_time
     await get_tree().create_timer(4.0).timeout  # process_always: this one runs while paused
     _screenshot("settings")
     var held: bool = JSON.stringify(main.state) == before and is_equal_approx(main._clock_time, clock)
-    main._settings.close()
+    app._settings.close()
     await get_tree().create_timer(4.0).timeout
     var resumed: bool = JSON.stringify(main.state) != before or main._clock_time < clock
     # 重新开始 → confirm: a fresh deal, and the old game's AI loop must not touch it
-    main._on_settings_pressed()
-    main._settings._ask_restart()
+    app._on_settings_pressed()
+    app._settings._ask_restart()
     await get_tree().create_timer(0.5).timeout
     _screenshot("restart_confirm")
     var game: int = main._game
-    main._settings._confirm.get_child(2).get_child(1).pressed.emit()
+    app._settings._confirm.get_child(2).get_child(1).pressed.emit()
     await get_tree().create_timer(DEAL_WAIT + 3.0).timeout
     var restarted: bool = main._game == game + 1 and main.state["phase"] == "bidding"
     main._games = [{"time": 1761900000, "role": "landlord", "won": true, "mult": 8, "delta": 80},
@@ -120,18 +128,33 @@ func _settings_check() -> void:
     main._on_score_pressed()
     await get_tree().create_timer(0.5).timeout
     _screenshot("history")
-    # Android back: closes the open panel first, then asks before quitting; back again cancels
+    # Android back: closes the open panel first, then offers the 大厅; back again cancels
     var back := func(): get_tree().root.propagate_notification(NOTIFICATION_WM_GO_BACK_REQUEST)
+    var confirm: ConfirmView = app._confirm
     back.call()
-    var back_closes: bool = not main._history.visible and not main._quit.visible
+    var back_closes: bool = not main._history.visible and not confirm.visible
     back.call()
     await get_tree().create_timer(0.5).timeout
-    _screenshot("quit")
-    var asks: bool = main._quit.visible and main._quit._warn.visible and get_tree().paused
+    _screenshot("leave")
+    var asks: bool = confirm.visible and confirm._title.text == "返回大厅？" and confirm._note.visible \
+            and get_tree().paused
     back.call()
-    var cancels: bool = not main._quit.visible and not get_tree().paused
+    var cancels: bool = not confirm.visible and not get_tree().paused and app.game != null
+    # now go: the table goes away mid-game (its AI loop must not outlive it)
+    back.call()
+    confirm._ok.pressed.emit()
+    await get_tree().create_timer(2.0).timeout
+    _screenshot("lobby_again")
+    var left: bool = app.game == null and app._lobby.visible and not is_instance_valid(main)
+    back.call()  # in the 大厅 it offers to quit
+    var quit_asks: bool = confirm.visible and confirm._title.text == "退出游戏？" and not confirm._note.visible
+    back.call()
+    await _open_doudizhu()
+    await get_tree().create_timer(DEAL_WAIT + 2.0).timeout
+    var reopened: bool = main.state.get("phase") == "bidding"
     print("AUTOTEST DONE paused_held=", held, " resumed=", resumed, " restarted=", restarted,
-            " back_closes=", back_closes, " quit_asks=", asks, " quit_cancels=", cancels)
+            " back_closes=", back_closes, " leave_asks=", asks, " leave_cancels=", cancels,
+            " left=", left, " quit_asks=", quit_asks, " reopened=", reopened)
     get_tree().quit()
 
 ## Press at `from`, move to `to`, release, through the real input pipeline.
