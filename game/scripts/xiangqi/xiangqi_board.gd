@@ -5,7 +5,9 @@ extends Control
 ## human's side: `flipped` when they play black. A tap near an intersection emits
 ## `square_pressed` in board coordinates (x = file from red's left, y = rank from black's
 ## back rank). The picked piece lifts and its moves show as dots; the last move's two
-## squares get corner marks, the 提示 pulses, a king in check glows red; moves slide.
+## squares get corner marks, the 提示 pulses, a king in check glows red. Moves slide and
+## land with a bounce and a ripple; a taken piece spins off the board. A new game's
+## pieces drop in one by one (`intro()`; a tap skips it), a mated king wobbles.
 
 signal square_pressed(x: int, y: int)
 
@@ -22,6 +24,11 @@ const MARKS := [Vector2i(1, 2), Vector2i(7, 2), Vector2i(1, 7), Vector2i(7, 7),
         Vector2i(0, 3), Vector2i(2, 3), Vector2i(4, 3), Vector2i(6, 3), Vector2i(8, 3),
         Vector2i(0, 6), Vector2i(2, 6), Vector2i(4, 6), Vector2i(6, 6), Vector2i(8, 6)]
 const SLIDE_TIME := 0.22
+const LAND_TIME := 0.3
+const FLY_TIME := 0.55
+const INTRO_STEP := 0.025  # between one piece dropping in and the next
+const INTRO_DROP := 0.28
+const WOBBLE_TIME := 0.9
 ## Wood left around the outermost lines, in steps, so edge pieces stay on the board.
 const PAD := 0.3
 const ASPECT := (9.0 + 2 * PAD) / (10.0 + 2 * PAD)
@@ -37,7 +44,12 @@ var _cells: Array = []  # 90 piece letters, "" for empty
 var _last: Array = []
 var _check := Vector2i(-1, -1)  # the king in check
 var _slides := {}  # square index -> [from Vector2i, seconds]
-var _fading := {}  # square index -> [piece letter, seconds]
+var _lands := {}  # square index -> seconds since its piece landed
+var _flying := {}  # square index -> [piece letter, direction, spin, seconds]; waits for the slide
+var _intro := {}  # square index -> delay before it drops in, while the entrance runs
+var _intro_t := 0.0
+var _intro_end := 0.0
+var _wobble := -1.0  # seconds into the mated king's wobble
 var _t := 0.0
 
 static func font() -> Font:
@@ -57,11 +69,13 @@ func show_position(cells: Array, last, in_check: bool, to_move: String) -> void:
         var to := int(last[3]) * 9 + int(last[2])
         if cells[to] != "" and _cells[from] == cells[to]:  # a move forward, not a 悔棋
             _slides[to] = [Vector2i(int(last[0]), int(last[1])), 0.0]
-            if _cells[to] != "":
-                _fading[to] = [_cells[to], 0.0]
+            if _cells[to] != "":  # knocked off the way the taker came
+                var dir := (square_center(int(last[2]), int(last[3])) - square_center(int(last[0]), int(last[1]))).normalized()
+                _flying[to] = [_cells[to], dir.rotated(randf_range(-0.5, 0.5)), [-1.0, 1.0].pick_random(), -SLIDE_TIME]
     _cells = cells.duplicate()
     _last = last if last is Array else []
     _check = Vector2i(-1, -1)
+    _wobble = -1.0
     if in_check:
         var king := "K" if to_move == "red" else "k"
         var i := _cells.find(king)
@@ -70,6 +84,28 @@ func show_position(cells: Array, last, in_check: bool, to_move: String) -> void:
     selected = Vector2i(-1, -1)
     targets.clear()
     queue_redraw()
+
+## Drop the pieces in, from the back ranks forward, red then black. Returns how long
+## it takes.
+func intro() -> float:
+    _intro.clear()
+    var order := []
+    for i in 90:
+        if _cells[i] != "":
+            var red: bool = _cells[i] == _cells[i].to_upper()
+            var rank: int = 9 - i / 9 if red else i / 9
+            order.append([int(not red) * 1000 + rank * 10 + absi(i % 9 - 4), i])
+    order.sort_custom(func(a, b): return a[0] < b[0])
+    for n in order.size():
+        _intro[order[n][1]] = n * INTRO_STEP
+    _intro_t = 0.0
+    _intro_end = maxf(0, order.size() - 1) * INTRO_STEP + INTRO_DROP
+    queue_redraw()
+    return _intro_end
+
+## The king in check shakes its head (绝杀).
+func wobble_king() -> void:
+    _wobble = 0.0
 
 func step_size() -> float:
     return size.y / (10.0 + 2 * PAD)
@@ -89,15 +125,33 @@ func _process(delta: float) -> void:
         _slides[k][1] += delta
         if _slides[k][1] > SLIDE_TIME:
             _slides.erase(k)
-    for k in _fading.keys():
-        _fading[k][1] += delta
-        if _fading[k][1] > 0.3:
-            _fading.erase(k)
-    if not _slides.is_empty() or not _fading.is_empty() or not hint.is_empty() or _check.x >= 0 \
-            or selected.x >= 0:
+            _lands[k] = 0.0
+    for k in _lands.keys():
+        _lands[k] += delta
+        if _lands[k] > LAND_TIME:
+            _lands.erase(k)
+    for k in _flying.keys():
+        _flying[k][3] += delta
+        if _flying[k][3] > FLY_TIME:
+            _flying.erase(k)
+    if not _intro.is_empty():
+        _intro_t += delta
+        if _intro_t > _intro_end:
+            _intro.clear()
+    if _wobble >= 0.0:
+        _wobble += delta
+        if _wobble > WOBBLE_TIME:
+            _wobble = -1.0
+    if not (_slides.is_empty() and _lands.is_empty() and _flying.is_empty() and _intro.is_empty()
+            and hint.is_empty()) or _check.x >= 0 or selected.x >= 0:
         queue_redraw()
 
 func _gui_input(event: InputEvent) -> void:
+    if not _intro.is_empty() and event is InputEventMouseButton and event.pressed:
+        _intro.clear()  # a tap skips the entrance
+        accept_event()
+        queue_redraw()
+        return
     if not (interactive and event is InputEventMouseButton and event.pressed
             and event.button_index == MOUSE_BUTTON_LEFT):
         return
@@ -124,9 +178,9 @@ func _draw() -> void:
         draw_line(Vector2(0, y), Vector2(size.x, y + s * 0.3 * sin(i * 0.8)), Color(0.6, 0.4, 0.2, 0.08), s * 0.22)
     _draw_grid(s)
     var r := s * 0.44
-    for k in _fading:
-        var f: Array = _fading[k]
-        draw_piece(self, _square_center_index(k), r, f[0], 1.0 - f[1] / 0.3)
+    for k in _flying:  # still waiting for the taker to arrive
+        if _flying[k][3] < 0.0:
+            draw_piece(self, _square_center_index(k), r, _flying[k][0])
     if _last.size() == 4:
         _corners(square_center(int(_last[0]), int(_last[1])), s, Color(0.15, 0.4, 0.8, 0.8))
         _corners(square_center(int(_last[2]), int(_last[3])), s, Color(0.15, 0.4, 0.8, 0.8))
@@ -135,14 +189,43 @@ func _draw() -> void:
         if name == "" or Vector2i(i % 9, i / 9) == selected:
             continue
         var at := _square_center_index(i)
+        var grow := 1.0
+        var lift := 1.0
+        var alpha := 1.0
+        if _intro.has(i):  # falls in from above, speeding up, and lands
+            var k := clampf((_intro_t - _intro[i]) / INTRO_DROP, 0.0, 1.0)
+            if k <= 0.0:
+                continue
+            at.y -= s * 1.4 * (1.0 - k * k)
+            grow = 1.0 + 0.25 * (1.0 - k)
+            lift = 1.0 + 4.0 * (1.0 - k)
+            alpha = minf(1.0, k * 3.0)
         if _slides.has(i):
             var from: Vector2i = _slides[i][0]
             var k := ease(_slides[i][1] / SLIDE_TIME, 0.4)
             at = square_center(from.x, from.y).lerp(at, k)
+        if _lands.has(i):  # a little bounce, and a ripple across the wood
+            var k: float = _lands[i] / LAND_TIME
+            grow = 1.0 + 0.08 * sin(k * PI)
+            draw_arc(at, r * (1.0 + 0.7 * k), 0, TAU, 48, Color(0.3, 0.16, 0.06, 0.45 * (1.0 - k)), 3.0, true)
+        var angle := 0.0
         if Vector2i(i % 9, i / 9) == _check:
             var pulse := 0.5 + 0.5 * sin(_t * 8.0)
             draw_circle(at, r * (1.12 + 0.08 * pulse), Color(1, 0.2, 0.1, 0.35 + 0.35 * pulse), true, -1.0, true)
-        draw_piece(self, at, r, name)
+            if _wobble >= 0.0:
+                angle = sin(_wobble * 28.0) * 0.28 * (1.0 - _wobble / WOBBLE_TIME)
+        draw_set_transform(at, angle)
+        draw_piece(self, Vector2.ZERO, r * grow, name, alpha, lift)
+        draw_set_transform(Vector2.ZERO)
+    for k in _flying:  # spinning off the board, fading
+        var f: Array = _flying[k]
+        if f[3] < 0.0:
+            continue
+        var q: float = f[3] / FLY_TIME
+        var at: Vector2 = _square_center_index(k) + f[1] * s * 3.2 * ease(q, 0.5) - Vector2(0, s * 0.9 * sin(q * PI))
+        draw_set_transform(at, f[2] * q * TAU * 1.3)
+        draw_piece(self, Vector2.ZERO, r * (1.0 + 0.25 * q), f[0], 1.0 - q * q, 1.0 + 4.0 * sin(q * PI))
+        draw_set_transform(Vector2.ZERO)
     for t in targets:  # where the picked piece can go
         var c := square_center(t.x, t.y)
         if _cells[t.y * 9 + t.x] == "":

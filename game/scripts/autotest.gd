@@ -257,6 +257,15 @@ func _xiangqi_check() -> void:
         await get_tree().create_timer(0.1).timeout
     _screenshot("xiangqi_midgame")
     var played := int(g.state["move_count"])
+    # a capture: the 车 takes the 卒, which spins off the board
+    g._game += 1
+    g._busy = false
+    g._apply(await Core.request("xiangqi_setup", {"fen": "4k4/9/9/9/p8/9/9/9/9/R2K5 w", "human": 0, "level": 0}))
+    tap.call(0, 9)
+    await get_tree().create_timer(0.2).timeout
+    tap.call(0, 4)
+    await get_tree().create_timer(0.4).timeout
+    _screenshot("xiangqi_capture")
     # a mate in one, through the real taps: 车 down the h-file to the back rank
     g._game += 1  # as a new game would: any AI turn still pending is void
     g._busy = false

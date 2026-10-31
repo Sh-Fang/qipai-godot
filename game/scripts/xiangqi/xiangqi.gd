@@ -1,11 +1,15 @@
 extends BoardGameTable
 ## 象棋 table (the shared parts are in scripts/board_game_table.gd). Tap one of your
-## pieces to pick it up (its moves show on the board), then a dot to move there. A check
-## gets a 将军 stamp, a mate 绝杀.
+## pieces to pick it up (its moves show on the board), then a dot to move there. Pieces
+## knock down on the wood as they land; a capture sends up chips and shakes the board, a
+## check gets a drum and a 将军 stamp, a mate a gong, 绝杀 and red edges. A new game
+## opens with a soft gong as the pieces drop in.
 
 const RED := 0
 const BLACK := 1
 const REASONS := {"长将": "长将判负"}
+const CHIPS := [Color(0.8, 0.6, 0.36), Color(0.52, 0.33, 0.16), Color(0.35, 0.2, 0.08, 0.0)]
+const SEAL := Color(0.84, 0.35, 0.33)  # XiangqiBoard.RED_INK.lightened(0.25)
 
 func _prefix() -> String:
     return "xiangqi"
@@ -50,15 +54,39 @@ func _on_square(x: int, y: int) -> void:
         board.selected = Vector2i(-1, -1)
     board.queue_redraw()
 
+func _start_sound() -> String:
+    return "guofeng/gong-soft"
+
+func _undo_sound() -> String:
+    return "guofeng/wood-1"
+
+func _intro() -> float:
+    return board.intro()
+
+## Everything happens as the piece lands, at the end of its slide.
 func _on_moved(event: Dictionary) -> void:
+    var game := _game
+    var to: Vector2 = board.square_center(int(state["last"][2]), int(state["last"][3]))
+    var mate: bool = state["phase"] == "over" and state["reason"] == "将死"
+    await get_tree().create_timer(XiangqiBoard.SLIDE_TIME, false).timeout
+    if game != _game:
+        return
     if event.get("captured", "") != "":
-        Sfx.play("kenney/chips-collide-1")
+        Sfx.play("guofeng/wood-capture")
+        _fx.burst(board.position + to, CHIPS, 34, 340.0, false)
+        _shake(5.0)
     else:
-        Sfx.play("kenney/chip-lay-%d" % randi_range(1, 3))
-    if state["phase"] == "over" and state["reason"] == "将死":
-        _fx.banner("绝杀", XiangqiBoard.RED_INK.lightened(0.25), Vector2(-1, -1), 120, 0.9)
+        Sfx.play("guofeng/wood-%d" % randi_range(1, 3))
+    if mate:
+        Sfx.play("guofeng/gong")
+        _fx.banner("绝杀", SEAL, Vector2(-1, -1), 120, 0.9)
+        _fx.edge_glow(Color(0.85, 0.08, 0.04, 0.5))
+        board.wobble_king()
+        _shake(9.0, 0.45)
     elif event.get("check", false):
-        _fx.banner("将军", XiangqiBoard.RED_INK.lightened(0.25), Vector2(-1, -1), 96, 0.6)
+        Sfx.play("guofeng/drum")
+        _fx.banner("将军", SEAL, Vector2(-1, -1), 96, 0.6)
+        _shake(4.0)
 
 func _show_hint(hint) -> void:
     board.hint = hint if hint is Array else []
