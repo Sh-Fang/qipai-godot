@@ -86,3 +86,11 @@ static func _button(t: Theme, type: String, color: Color) -> void:
     t.set_color("font_disabled_color", type, Color(1, 1, 1, 0.45))
     t.set_color("font_outline_color", type, Color(color.darkened(0.5), 0.8))
     t.set_constant("outline_size", type, 4)
+
+## Buttons squash while held and spring back on release.
+static func juicy(b: Button) -> void:
+    b.resized.connect(func(): b.pivot_offset = b.size / 2)
+    b.button_down.connect(func(): b.create_tween().tween_property(b, "scale", Vector2(0.92, 0.92), 0.06))
+    b.button_up.connect(func():
+        b.create_tween().tween_property(b, "scale", Vector2.ONE, 0.2) \
+                .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))

@@ -94,7 +94,7 @@ func _ready() -> void:
     _set_actions([])
     hand.selection_changed.connect(_update_play_button)
     for b in find_children("*", "Button", true, false):
-        _juicy(b)
+        UiTheme.juicy(b)
 
 # ---- what the app calls (see scripts/app.gd) ----------------------------------
 
@@ -309,14 +309,6 @@ func _unhandled_input(event: InputEvent) -> void:
 func _press_if_ready(b: Button) -> void:
     if b.is_visible_in_tree() and not b.disabled:
         b.pressed.emit()
-
-## Buttons squash while held and spring back on release.
-func _juicy(b: Button) -> void:
-    b.resized.connect(func(): b.pivot_offset = b.size / 2)
-    b.button_down.connect(func(): b.create_tween().tween_property(b, "scale", Vector2(0.92, 0.92), 0.06))
-    b.button_up.connect(func():
-        b.create_tween().tween_property(b, "scale", Vector2.ONE, 0.2) \
-                .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
 
 # ---- rendering ----------------------------------------------------------------
 
