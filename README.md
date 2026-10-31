@@ -18,13 +18,15 @@ game/              Godot 4.7 项目（只做 UI）
   bin/             编译出的扩展 + libonnxruntime（android/ 下是手机版；编译生成，不进 git）
   douzero.gdextension
   scripts/core_client.gd   调用 DouZeroCore（在工作线程里跑，不卡帧）
-  scripts/main.gd          牌桌界面
-  scripts/card_view.gd     单张牌（显示顺序：大的在左）
-  scripts/hand_view.gd     手牌排列与选牌
+  scenes/doudizhu.tscn     斗地主牌桌；脚本在 scripts/doudizhu/：
+    doudizhu.gd            牌桌界面
+    card_view.gd           单张牌（显示顺序：大的在左）
+    hand_view.gd           手牌排列与选牌
+    seat_view.gd 座位头像、clock_view.gd 回合倒计时闹钟、history_view.gd 积分记录
   scripts/autotest.gd      自动打一局并截图的冒烟测试（还有选牌、超时、设置、特效几种模式）
-  scripts/home_view.gd     首页（加载进度条 → 开始游戏）；scripts/clock_view.gd 回合倒计时闹钟
+  scripts/home_view.gd     首页（加载进度条 → 开始游戏）
   scripts/modal.gd         弹窗底座（压暗牌桌、暂停游戏）；settings_view.gd 设置（音效、音乐、重新开始）；
-                           history_view.gd 积分记录；quit_view.gd 退出确认（安卓返回键、关窗口）
+                           quit_view.gd 退出确认（安卓返回键、关窗口）
 reference/         原 Python 核心，作为 C++ 核心的参照（DouZero 原版 env，Apache-2.0）
   scripts/check_cpp.py     逐步对比两边的叫地主、合法动作、模型打分、事件和局面
   scripts/export_bid_model.py  下载叫地主模型权重并转成 game/models/bid.onnx

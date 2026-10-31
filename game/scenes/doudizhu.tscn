@@ -1,8 +1,8 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
-[ext_resource type="Script" path="res://scripts/hand_view.gd" id="2_hand"]
-[ext_resource type="Script" path="res://scripts/seat_view.gd" id="3_seat"]
+[ext_resource type="Script" path="res://scripts/doudizhu/doudizhu.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/doudizhu/hand_view.gd" id="2_hand"]
+[ext_resource type="Script" path="res://scripts/doudizhu/seat_view.gd" id="3_seat"]
 [ext_resource type="Script" path="res://scripts/fx.gd" id="4_fx"]
 [ext_resource type="Shader" path="res://shaders/table.gdshader" id="5_table"]
 
