@@ -54,12 +54,23 @@ std::vector<float> Policy::evaluate(const GameEnv& env) {
     return {values, values + obs.n};
 }
 
-Move Policy::act(const GameEnv& env) {
+std::vector<Move> Policy::ranked(const GameEnv& env) {
     const auto& legal = env.legal();
-    if (legal.size() == 1) return legal[0];
+    if (legal.size() <= 1) return legal;
     auto values = evaluate(env);
-    return legal[std::max_element(values.begin(), values.end()) - values.begin()];
+    std::vector<size_t> order(legal.size());
+    for (size_t i = 0; i < order.size(); ++i) {
+        order[i] = i;
+        int type = move_type(legal[i]).type;
+        if (type == TYPE_13_4_2 || type == TYPE_14_4_22) values[i] -= FOUR_WITH_TWO_MARGIN;
+    }
+    std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return values[a] > values[b]; });
+    std::vector<Move> out;
+    for (size_t i : order) out.push_back(legal[i]);
+    return out;
 }
+
+Move Policy::act(const GameEnv& env) { return ranked(env).front(); }
 
 float Policy::bid_score(const Move& hand) {
     // 4x15 matrix, columns 3..A, 2, 小王, 大王; row r set if the hand holds more than r.
