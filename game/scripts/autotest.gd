@@ -11,6 +11,9 @@ extends Node
 ## then restarts through the confirmation, opens the 积分记录 and walks Android back through
 ## closing it, 返回大厅？ (cancel, then go), the 大厅's 退出游戏？ (cancel) and opening
 ## 斗地主 again.
+## `-- --autotest --gomoku` opens 五子棋 instead and plays a game by tapping each 提示
+## (taking one move back on the way), then checks the result, the 战绩, switching to
+## 执白 (the AI opens) and 返回大厅.
 
 const DEAL_WAIT := 2.0
 
@@ -28,6 +31,9 @@ func _ready() -> void:
         await get_tree().process_frame
     await get_tree().create_timer(0.8).timeout
     _screenshot("lobby")
+    if OS.get_cmdline_user_args().has("--gomoku"):
+        _gomoku_check()
+        return
     await _open_doudizhu()
     if OS.get_cmdline_user_args().has("--cards"):
         _card_gallery()
@@ -155,6 +161,65 @@ func _settings_check() -> void:
     print("AUTOTEST DONE paused_held=", held, " resumed=", resumed, " restarted=", restarted,
             " back_closes=", back_closes, " leave_asks=", asks, " leave_cancels=", cancels,
             " left=", left, " quit_asks=", quit_asks, " reopened=", reopened)
+    get_tree().quit()
+
+func _gomoku_check() -> void:
+    app._lobby.choose("gomoku")
+    while app.game == null:
+        await get_tree().process_frame
+    var g: Node = app.game
+    await get_tree().create_timer(1.0).timeout
+    _screenshot("gomoku_start")
+    var board: GomokuBoard = g._board
+    var moves := 0
+    var undo_ok := false
+    while g.state.get("phase") == "playing" and moves < 120:
+        var waited := 0.0
+        while not g._my_turn() and g.state.get("phase") == "playing" and waited < 10.0:
+            await get_tree().create_timer(0.1).timeout
+            waited += 0.1
+        if g.state.get("phase") != "playing":
+            break
+        if moves == 3 and not undo_ok:  # take back my move and the AI's answer
+            var before := int(g.state["move_count"])
+            await g._on_undo()
+            undo_ok = int(g.state["move_count"]) == before - 2
+            continue
+        await g._on_hint()
+        var h: Vector2i = board.hint
+        if moves == 2:
+            await get_tree().create_timer(0.3).timeout
+            _screenshot("gomoku_hint")
+        var at := board.global_position + board.cell_center(h.x, h.y)
+        _drag(at, at)  # a real tap on the board
+        moves += 1
+        await get_tree().create_timer(0.2).timeout
+    await get_tree().create_timer(0.3).timeout
+    _screenshot("gomoku_over")
+    await get_tree().create_timer(2.2).timeout
+    _screenshot("gomoku_result")
+    var result_shown: bool = g._result.visible
+    var record: Array = g._record[0].duplicate()
+    # 再来一局, then 对局设置: 普通, 执白 -> the AI (black) opens in the centre
+    g._result.box.get_child(-1).get_child(1).pressed.emit()
+    await get_tree().create_timer(0.5).timeout
+    g._chip.pressed.emit()
+    g._setup._levels[1].pressed.emit()
+    g._setup._sides[1].pressed.emit()
+    await get_tree().create_timer(0.4).timeout
+    _screenshot("gomoku_setup")
+    g._setup.box.get_child(-1).pressed.emit()
+    await get_tree().create_timer(2.0).timeout
+    var ai_first: bool = int(g.state["move_count"]) == 1 and int(g.state["board"][7 * 15 + 7]) == 1 \
+            and g._human == 2 and g._level == 1
+    _screenshot("gomoku_white")
+    get_tree().root.propagate_notification(NOTIFICATION_WM_GO_BACK_REQUEST)
+    app._confirm._ok.pressed.emit()
+    await get_tree().create_timer(1.0).timeout
+    var left: bool = app.game == null and app._lobby.visible
+    print("AUTOTEST DONE gomoku_over=", g.state.get("phase") == "over" if is_instance_valid(g) else true,
+            " moves=", moves, " undo_ok=", undo_ok, " result_shown=", result_shown, " record=", record,
+            " ai_first=", ai_first, " left=", left)
     get_tree().quit()
 
 ## Press at `from`, move to `to`, release, through the real input pipeline.

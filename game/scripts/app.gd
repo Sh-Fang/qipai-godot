@@ -9,10 +9,12 @@ extends Control
 ##   restart()         abandon the current game for a new one (设置 → 重新开始)
 ##   in_progress()     whether leaving now abandons a game
 ##   forfeit_note()    what abandoning it costs, shown when asking ("本局不计分")
-## and keeps its top-left corner clear for the 返回 button (see CORNER).
+## and may emit `leave_requested` (返回大厅 on its result panel: no question asked).
+## It keeps its top-left corner clear for the 返回 button and its top-right corner for
+## the gear (see CORNER).
 
 ## Scene of each game the lobby can open.
-const GAMES := {"doudizhu": "res://scenes/doudizhu.tscn"}
+const GAMES := {"doudizhu": "res://scenes/doudizhu.tscn", "gomoku": "res://scenes/gomoku.tscn"}
 ## Extra room kept clear along the screen edges on phones (rounded corners, camera
 ## cutout), on top of whatever the system reports as unsafe.
 const PHONE_PAD := Vector2(40, 10)
@@ -126,6 +128,8 @@ func _corner_button(kind: RoundButton.Kind, label: String, right: bool, action: 
 func _open_game(id: String) -> void:
     game = load(GAMES[id]).instantiate()
     _host.add_child(game)
+    if game.has_signal("leave_requested"):
+        game.leave_requested.connect(_leave)
     _back.show()
     game.start()
 

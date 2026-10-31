@@ -31,6 +31,8 @@ game/              Godot 4.7 项目（只做 UI）
   scripts/modal.gd         弹窗底座（压暗牌桌、暂停游戏）；settings_view.gd 设置（音效、音乐、重新开始）；
                            confirm_view.gd 返回大厅 / 退出确认（安卓返回键、关窗口）
   scripts/save.gd          存档 user://save.cfg（设置和各游戏各占一节）；round_button.gd 角落的圆形按钮
+  scenes/gomoku.tscn       五子棋；脚本在 scripts/gomoku/：gomoku.gd 棋桌、gomoku_board.gd 棋盘和棋子
+  scripts/match_setup_view.gd / record_view.gd / result_view.gd   棋类共用：对局设置（难度、执子）、战绩、结算
 reference/         原 Python 核心，作为 C++ 核心的参照（DouZero 原版 env，Apache-2.0）
   scripts/check_cpp.py     逐步对比两边的叫地主、合法动作、模型打分、事件和局面
   scripts/export_bid_model.py  下载叫地主模型权重并转成 game/models/bid.onnx
@@ -134,6 +136,7 @@ godot --path game -- --autotest               # 通过真实 UI 打一局并截�
 godot --path game -- --autotest --select      # 选牌回归：拖选 99987、点掉 8、打出后不应残留选中
 godot --path game -- --autotest --timeout     # 倒计时：叫地主、加倍、出牌三个阶段都等到超时
 godot --path game -- --autotest --settings    # 设置暂停/继续、重新开始（二次确认）、积分记录、返回键（返回大厅、退出确认、再进斗地主）
+godot --path game -- --autotest --gomoku      # 五子棋：按提示下完一局（中途悔棋）、结算、战绩、改执白、返回大厅
 godot --path game -- --autotest --fxdemo      # 依次播放各种特效并截图
 godot --path game --resolution 1600x720 -- --phone   # 按手机比例和手机边距看布局
 ```
