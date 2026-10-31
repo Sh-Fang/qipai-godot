@@ -93,6 +93,17 @@ func music(track: String) -> void:
         stream.set("loop", true)  # both mp3 and ogg streams have it
         _start(_music, stream, MUSIC_DB))
 
+## Turn the music down for a few seconds, under a jingle, then back up.
+func duck(seconds: float, by_db := 10.0) -> void:
+    if not _music.playing:
+        return
+    if _fade:
+        _fade.kill()
+    _fade = _music.create_tween()
+    _fade.tween_property(_music, "volume_db", MUSIC_DB - by_db, 0.3)
+    _fade.tween_interval(seconds)
+    _fade.tween_property(_music, "volume_db", MUSIC_DB, 1.5)
+
 ## Stop everything on quit, or a sound still playing leaks its stream.
 func _exit_tree() -> void:
     for p in get_children():

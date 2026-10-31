@@ -307,7 +307,8 @@ func _finish() -> void:
     await get_tree().create_timer(1.4, false).timeout
     if game != _game:
         return
-    Sfx.play("win" if outcome == "win" else "lose")
+    Sfx.duck(2.5)
+    Sfx.play("guofeng/" + outcome)
     if outcome == "win":
         _fx.confetti()
     var detail := _result_detail()
