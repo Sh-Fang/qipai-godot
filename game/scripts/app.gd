@@ -21,7 +21,7 @@ const GAMES := {"doudizhu": "res://scenes/doudizhu.tscn", "gomoku": "res://scene
 const PHONE_PAD := Vector2(40, 10)
 ## The corner buttons sit this far in from the (safe) screen edge.
 const CORNER := Vector2(16, 12)
-const LOBBY_MUSIC := "bgm_welcome"
+const LOBBY_MUSIC := "local/lobby"
 
 ## Insets (left, top, right, bottom) of the safe area on phones; zero on desktop unless
 ## run with `-- --phone`.

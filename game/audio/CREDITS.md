@@ -13,3 +13,13 @@
 - `kenney/`：Kenney《Casino Audio》1.1，CC0（`kenney/License.txt`），取自
   https://opengameart.org/content/54-casino-sound-effects-cards-dice-chips 。
   五子棋落子用 `chip-lay-*`，悔棋收子用 `chips-collide-1`。
+
+## 单独提供的背景音乐
+
+`local/` 下是三首古风背景音乐，由项目作者单独提供，不进仓库：
+
+- `lobby.ogg`：大厅
+- `gomoku.ogg`：五子棋
+- `xiangqi.ogg`：象棋
+
+文件缺失时对应界面不放背景音乐，不影响运行。

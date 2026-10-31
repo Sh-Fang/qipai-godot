@@ -200,6 +200,7 @@ func _layout() -> void:
 # ---- what the app calls (see scripts/app.gd) ----------------------------------
 
 func start() -> void:
+    Sfx.music("local/" + _prefix())
     _new_game()
 
 func restart() -> void:

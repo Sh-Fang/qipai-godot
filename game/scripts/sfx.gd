@@ -72,7 +72,8 @@ func voice(gender: String, line: String, delay := 0.0) -> void:
         await get_tree().create_timer(delay).timeout
     _start(_voices[gender], stream)
 
-## Loop a track from bgm/ (bgm_welcome, bgm_normal, bgm_warning); "" stops the music.
+## Loop a track from bgm/ (bgm_welcome, bgm_normal, bgm_warning), or one by its path
+## under audio/ ("local/lobby"); "" stops the music. A missing track just stays silent.
 func music(track: String) -> void:
     if track == _track:
         return
@@ -86,7 +87,9 @@ func music(track: String) -> void:
         _music.stop()
         if track == "":
             return
-        var stream := _load("bgm/" + track)
+        var stream := _load(track if "/" in track else "bgm/" + track)
+        if not stream:
+            return
         stream.set("loop", true)  # both mp3 and ogg streams have it
         _start(_music, stream, MUSIC_DB))
 
