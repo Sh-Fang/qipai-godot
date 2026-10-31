@@ -1,6 +1,6 @@
 extends Node
 ## Audio (autoload `Sfx`), using the 欢乐斗地主 sound set in audio/hlddz/ (mp3), plus
-## free (CC0) sounds anywhere else under audio/ (ogg), named by path: "kenney/chip-lay-1".
+## our own sounds anywhere else under audio/ (ogg), named by path: "guofeng/stone-1".
 ## `play()` fires a one-shot effect, `voice()` speaks a line in a male or female
 ## voice, `music()` switches the looping background track. Effects and voices go to
 ## the "Sound" bus and music to "Music", so 设置 can switch them off separately.
@@ -41,7 +41,7 @@ func set_music_on(on: bool) -> void:
     AudioServer.set_bus_mute(AudioServer.get_bus_index("Music"), not on)
 
 ## One-shot effect from sfx/ (deal, select, play, bomb, plane, straight, win, ...), or a
-## free sound by its path under audio/ ("kenney/chip-lay-1").
+## sound by its path under audio/ ("guofeng/stone-1").
 func play(key: String, volume_db := 0.0) -> void:
     var stream := _load(key if "/" in key else "sfx/" + key)
     if stream:
