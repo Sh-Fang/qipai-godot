@@ -170,7 +170,7 @@ func _gomoku_check() -> void:
     var g: Node = app.game
     await get_tree().create_timer(1.0).timeout
     _screenshot("gomoku_start")
-    var board: GomokuBoard = g._board
+    var board: GomokuBoard = g.board
     var moves := 0
     var undo_ok := false
     while g.state.get("phase") == "playing" and moves < 120:

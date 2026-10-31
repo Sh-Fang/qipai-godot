@@ -32,8 +32,9 @@ game/              Godot 4.7 项目（只做 UI）
   scripts/modal.gd         弹窗底座（压暗牌桌、暂停游戏）；settings_view.gd 设置（音效、音乐、重新开始）；
                            confirm_view.gd 返回大厅 / 退出确认（安卓返回键、关窗口）
   scripts/save.gd          存档 user://save.cfg（设置和各游戏各占一节）；round_button.gd 角落的圆形按钮
+  scripts/board_game_table.gd   棋类共用的棋桌：两侧栏、AI 回合、悔棋 / 提示、战绩和存档；
+                           match_setup_view.gd / record_view.gd / result_view.gd 对局设置（难度、执子）、战绩、结算
   scenes/gomoku.tscn       五子棋；脚本在 scripts/gomoku/：gomoku.gd 棋桌、gomoku_board.gd 棋盘和棋子
-  scripts/match_setup_view.gd / record_view.gd / result_view.gd   棋类共用：对局设置（难度、执子）、战绩、结算
 reference/         原 Python 核心，作为 C++ 核心的参照（DouZero 原版 env，Apache-2.0）
   scripts/check_cpp.py     逐步对比两边的叫地主、合法动作、模型打分、事件和局面
   scripts/export_bid_model.py  下载叫地主模型权重并转成 game/models/bid.onnx
