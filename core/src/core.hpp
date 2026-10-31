@@ -3,6 +3,7 @@
 // Request:  {"cmd": "new_game" | "state" | "step" | "bid" | "play" | "pass" | "hint", ...}
 // Reply:    {"ok": true, "event": {...} | null, "state": {...}, "hint"?: [...]}
 //           {"ok": false, "error": "管不上", "state": {...}}
+// 五子棋 commands start with "gomoku_" and reply with the 五子棋 state instead.
 //
 // Godot calls this through the GDExtension wrapper; tests call it through
 // the douzero-cli JSON-lines tool.
@@ -11,6 +12,7 @@
 #include <memory>
 #include <string>
 
+#include "gomoku.hpp"
 #include "session.hpp"
 
 namespace dz {
@@ -25,6 +27,8 @@ public:
 private:
     std::unique_ptr<Policy> policy_;
     Session session_;
+    gomoku::Session gomoku_;
+    json handle_gomoku(const std::string& cmd, const json& req, json& resp);
 };
 
 }  // namespace dz

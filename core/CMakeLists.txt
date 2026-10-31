@@ -32,7 +32,7 @@ set_target_properties(onnxruntime PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES "${ORT_DIR}/include")
 
 add_library(douzero STATIC
-    src/rules.cpp src/game.cpp src/policy.cpp src/session.cpp src/core.cpp)
+    src/rules.cpp src/game.cpp src/policy.cpp src/session.cpp src/gomoku.cpp src/core.cpp)
 target_include_directories(douzero PUBLIC src third_party)
 target_link_libraries(douzero PUBLIC onnxruntime)
 target_compile_options(douzero PRIVATE -Wall -Wextra)

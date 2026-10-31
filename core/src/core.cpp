@@ -5,11 +5,48 @@
 namespace dz {
 
 Core::Core(std::unique_ptr<Policy> policy)
-    : policy_(std::move(policy)), session_(*policy_, std::random_device{}()) {}
+    : policy_(std::move(policy)), session_(*policy_, std::random_device{}()), gomoku_(std::random_device{}()) {}
+
+// gomoku_new {human: 1 黑 | 2 白, level: 0..2, seed?} · gomoku_play {x, y} · gomoku_step ·
+// gomoku_undo · gomoku_hint (-> "hint": [x, y]) · gomoku_state
+// Test hooks: gomoku_setup {moves, human, level} · gomoku_debug_step {level}
+json Core::handle_gomoku(const std::string& cmd, const json& req, json& resp) {
+    if (cmd == "gomoku_new") {
+        if (req.contains("seed")) gomoku_.reseed(req["seed"].get<uint64_t>());
+        gomoku_.new_game(req.value("human", 1), req.value("level", 0));
+    } else if (cmd == "gomoku_state") {
+    } else if (cmd == "gomoku_play") {
+        resp["event"] = gomoku_.play(req.value("x", -1), req.value("y", -1));
+    } else if (cmd == "gomoku_step") {
+        resp["event"] = gomoku_.step();
+    } else if (cmd == "gomoku_undo") {
+        resp["event"] = gomoku_.undo();
+    } else if (cmd == "gomoku_hint") {
+        resp["hint"] = gomoku_.hint();
+    } else if (cmd == "gomoku_debug_step") {
+        resp["event"] = gomoku_.force_step(req.value("level", 0));
+    } else if (cmd == "gomoku_setup") {
+        gomoku_.setup(req.at("moves").get<std::vector<std::array<int, 2>>>(), req.value("human", 1),
+                      req.value("level", 0));
+    } else {
+        throw RuleError("unknown cmd " + cmd);
+    }
+    return gomoku_.state();
+}
 
 json Core::handle(const json& req) {
     const std::string cmd = req.value("cmd", "");
     json resp = {{"id", req.value("id", json(nullptr))}, {"ok", true}, {"event", nullptr}};
+    if (cmd.rfind("gomoku_", 0) == 0) {
+        try {
+            resp["state"] = handle_gomoku(cmd, req, resp);
+        } catch (const std::exception& e) {
+            resp["ok"] = false;
+            resp["error"] = e.what();
+            resp["state"] = gomoku_.state();
+        }
+        return resp;
+    }
     try {
         if (cmd == "new_game") {
             if (req.contains("seed")) session_.reseed(req["seed"].get<uint64_t>());

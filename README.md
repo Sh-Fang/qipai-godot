@@ -10,6 +10,7 @@ core/              算法核心（C++）：规则 + 特征编码 + ONNX 推理 +
   src/game.*       出牌阶段状态 + 模型输入编码（DouZero GameEnv / get_obs 的移植）
   src/policy.*     ONNX Runtime 推理：每个合法动作打分，取最大值
   src/session.*    一局游戏：发牌、叫地主、出牌、胜负；UI 牌 id（0..53，带花色）<-> 点数
+  src/gomoku.*     五子棋：规则、AI（五格窗口打分 + alpha-beta，按难度限深度、加失误）、人机对局
   src/core.*       唯一入口：JSON 请求 -> JSON 回复
   gdextension/     Godot 扩展 DouZeroCore（编译到 game/bin/）
   cli/             douzero-cli：stdin/stdout JSON-lines，用于测试和对照
@@ -76,6 +77,19 @@ Godot 只发命令、只按返回的 state 渲染，不包含任何规则判断�
 
 每个回复：`{"ok", "error"?, "event"?, "state", "hint"?}`，state 字段见 `core/src/session.cpp` 的 `Session::state()`。
 另有 `debug_setup / debug_eval / debug_play` 三个测试命令，供对照脚本使用。
+
+五子棋的命令都以 `gomoku_` 开头，回复里的 state 是五子棋的局面（`board` 225 格，0 空 1 黑 2 白）：
+
+| cmd | 参数 | 说明 |
+|---|---|---|
+| `gomoku_new` | `human: 1 黑 \| 2 白`, `level: 0 简单 \| 1 普通 \| 2 困难` | 开新局，黑先 |
+| `gomoku_play` | `x, y` | 玩家落子（0..14） |
+| `gomoku_step` | | AI 落一子，UI 先停顿一下再调用 |
+| `gomoku_undo` | | 悔棋：撤回玩家上一步和 AI 随后的一步 |
+| `gomoku_hint` | | 提示：`hint: [x, y]`，用困难档的搜索 |
+
+用过悔棋或提示，state 里的 `assisted` 变为 true（困难档的胜局不计战绩）。
+`gomoku_setup / gomoku_debug_step` 是测试命令（`reference/tests/test_gomoku.py`）。
 
 座位：0 = 我（下方），1 = 下家（右），2 = 上家（左），按 0→1→2 轮流出牌。
 
