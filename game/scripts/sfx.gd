@@ -1,11 +1,13 @@
 extends Node
-## Audio (autoload `Sfx`), using the 欢乐斗地主 sound set in audio/hlddz/.
+## Audio (autoload `Sfx`), using the 欢乐斗地主 sound set in audio/hlddz/ (mp3), plus
+## free (CC0) sounds anywhere else under audio/ (ogg), named by path: "kenney/chip-lay-1".
 ## `play()` fires a one-shot effect, `voice()` speaks a line in a male or female
 ## voice, `music()` switches the looping background track. Effects and voices go to
 ## the "Sound" bus and music to "Music", so 设置 can switch them off separately.
 ## Runs while the game is paused, so the settings panel still clicks and music plays on.
 
 const DIR := "res://audio/hlddz/"
+const FREE_DIR := "res://audio/"
 const POOL_SIZE := 6
 const MUSIC_DB := -9.0
 const PASS_LINES := {
@@ -38,9 +40,10 @@ func set_sound_on(on: bool) -> void:
 func set_music_on(on: bool) -> void:
     AudioServer.set_bus_mute(AudioServer.get_bus_index("Music"), not on)
 
-## One-shot effect from sfx/ (deal, select, play, bomb, plane, straight, win, ...).
+## One-shot effect from sfx/ (deal, select, play, bomb, plane, straight, win, ...), or a
+## free sound by its path under audio/ ("kenney/chip-lay-1").
 func play(key: String, volume_db := 0.0) -> void:
-    var stream := _load("sfx/" + key)
+    var stream := _load(key if "/" in key else "sfx/" + key)
     if stream:
         var p := _players[_next]
         _next = (_next + 1) % _players.size()
@@ -84,7 +87,7 @@ func music(track: String) -> void:
         if track == "":
             return
         var stream := _load("bgm/" + track)
-        stream.loop = true
+        stream.set("loop", true)  # both mp3 and ogg streams have it
         _start(_music, stream, MUSIC_DB))
 
 ## Stop everything on quit, or a sound still playing leaks its stream.
@@ -93,9 +96,11 @@ func _exit_tree() -> void:
         p.stop()
         p.stream = null
 
-func _load(path: String) -> AudioStreamMP3:
+func _load(path: String) -> AudioStream:
     if not _cache.has(path):
         var full := DIR + path + ".mp3"
+        if not ResourceLoader.exists(full) and ResourceLoader.exists(FREE_DIR + path + ".ogg"):
+            full = FREE_DIR + path + ".ogg"
         _cache[path] = load(full) if ResourceLoader.exists(full) else null
         if _cache[path] == null:
             push_warning("missing sound: " + full)

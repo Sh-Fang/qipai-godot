@@ -7,3 +7,9 @@
 - jarryherr 的 doudizhu-soundboard（`sfx/select`、`double`、`spring`、`error`、`countdown`）
 
 不要把这些文件发布到公开仓库或随商业版本分发。
+
+## 可以公开的素材
+
+- `kenney/`：Kenney《Casino Audio》1.1，CC0（`kenney/License.txt`），取自
+  https://opengameart.org/content/54-casino-sound-effects-cards-dice-chips 。
+  五子棋落子用 `chip-lay-*`，悔棋收子用 `chips-collide-1`。
