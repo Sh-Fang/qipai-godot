@@ -8,13 +8,19 @@ const MODELS_DIR := "res://models"
 var _core: Object
 var _busy := false
 
-## Loads the extension and the three models. Returns false (and logs why) on failure.
+## Loads the extension and the models, on a worker thread so the loading screen keeps
+## animating. Returns false (and logs why) on failure.
 func start() -> bool:
     if not ClassDB.class_exists("DouZeroCore"):
         push_error("DouZeroCore extension not loaded; build it with: cmake --build core/build")
         return false
     _core = ClassDB.instantiate("DouZeroCore")
-    if not _core.load_models(MODELS_DIR):
+    var box := [false]
+    var task := WorkerThreadPool.add_task(func(): box[0] = _core.load_models(MODELS_DIR))
+    while not WorkerThreadPool.is_task_completed(task):
+        await get_tree().process_frame
+    WorkerThreadPool.wait_for_task_completion(task)
+    if not box[0]:
         push_error(_core.get_error())
         return false
     return true

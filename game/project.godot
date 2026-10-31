@@ -12,11 +12,17 @@ config_version=5
 
 config/name="DouZero 斗地主"
 run/main_scene="res://scenes/main.tscn"
+config/icon="res://art/icon/icon.png"
+config/auto_accept_quit=false
+config/quit_on_go_back=false
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0.07, 0.29, 0.18, 1)
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [autoload]
 
 Core="*res://scripts/core_client.gd"
+Sfx="*res://scripts/sfx.gd"
 
 [display]
 
@@ -29,5 +35,6 @@ window/handheld/orientation=0
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
 renderer/rendering_method.mobile="gl_compatibility"
 environment/defaults/default_clear_color=Color(0.07, 0.29, 0.18, 1)
