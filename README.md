@@ -37,8 +37,8 @@ game/              Godot 4.7 项目（只做 UI）
   scenes/gomoku.tscn       五子棋；脚本在 scripts/gomoku/：gomoku.gd 棋桌、gomoku_board.gd 棋盘和棋子
   scenes/xiangqi.tscn      象棋；脚本在 scripts/xiangqi/：xiangqi.gd 棋桌（点子、再点落点）、xiangqi_board.gd 棋盘和棋子
   fonts/xiangqi.ttf        棋子和楚河汉界用的霞鹜文楷（只含用到的 15 个字）
-  audio/                   音频，来源见 audio/CREDITS.md：hlddz/ 斗地主（腾讯版权，不进 git）、
-                           guofeng/ 棋类音效（自制）、local/ 大厅和棋类的背景音乐（单独提供，不进 git）
+  audio/                   音频，来源见 audio/CREDITS.md：hlddz/ 斗地主（腾讯版权）、
+                           guofeng/ 棋类音效（自制）、local/ 大厅和棋类的背景音乐
 tools/             jingles.py / board_sounds.py：用代码合成 game/audio/guofeng/ 的音效
 reference/         原 Python 核心，作为 C++ 核心的参照（DouZero 原版 env，Apache-2.0）
   scripts/check_cpp.py     逐步对比两边的叫地主、合法动作、模型打分、事件和局面
