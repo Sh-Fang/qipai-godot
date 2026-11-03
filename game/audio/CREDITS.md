@@ -1,22 +1,20 @@
 # 音频来源
 
-`hlddz/` 下的背景音乐、音效和人声均来自腾讯《欢乐斗地主》，版权归腾讯所有，这里仅作个人学习使用。
+`hlddz/` 下的背景音乐、音效和人声均来自腾讯《欢乐斗地主》，版权归腾讯所有，这里仅作个人学习使用，不得用于商业用途。
 经由以下开源仓库整理获得：
 
 - https://github.com/palemoky/fight-the-landlord （`bgm/`、`voice/`、`sfx/` 中的大部分）
 - jarryherr 的 doudizhu-soundboard（`sfx/select`、`double`、`spring`、`error`、`countdown`）
 
-不要把这些文件发布到公开仓库或随商业版本分发。
-
-## 可以公开的素材
+## 自制素材
 
 - `guofeng/`：五子棋、象棋的音效，本项目自制，用代码合成。
   - 胜/负/和：`tools/jingles.py`，五声音阶的拨弦声。
   - 木子、石子落盘、吃子、鼓、锣、磬、木鱼：`tools/board_sounds.py`。
 
-## 单独提供的背景音乐
+## 古风背景音乐
 
-`local/` 下是三首古风背景音乐，由项目作者单独提供，不进仓库：
+`local/` 下是三首古风背景音乐，由项目作者提供：
 
 - `lobby.ogg`：大厅
 - `gomoku.ogg`：五子棋

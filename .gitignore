@@ -22,7 +22,3 @@ wheels/
 
 # downloaded asset sources
 .cache/
-# 欢乐斗地主 audio (Tencent copyright) — local use only, see game/audio/CREDITS.md
-game/audio/hlddz/
-# 大厅/五子棋/象棋 background music, supplied separately — see game/audio/CREDITS.md
-game/audio/local/
